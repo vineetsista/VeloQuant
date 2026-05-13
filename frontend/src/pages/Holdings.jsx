@@ -130,9 +130,24 @@ export default function Holdings() {
 
   if (loading) return <div className="loading"><div className="spin" /><span>Loading holdings...</span></div>
 
-  const totalValue = holdings.reduce((s, h) => s + parseFloat(h.position_size), 0)
+  const totalCostBasis = holdings.reduce((s, h) => s + parseFloat(h.position_size), 0)
+  const hasMarketData = holdings.some(h => marketData[h.ticker]?.price?.close != null)
 
-  // Sector breakdown
+  // Live per-holding values
+  const holdingValues = holdings.map(h => {
+    const close = marketData[h.ticker]?.price?.close
+    const currentValue = h.shares && close ? h.shares * close : null
+    const gainLoss = currentValue !== null ? currentValue - parseFloat(h.position_size) : null
+    const gainLossPct = gainLoss !== null && parseFloat(h.position_size) > 0 ? gainLoss / parseFloat(h.position_size) * 100 : null
+    return { ...h, currentValue, gainLoss, gainLossPct }
+  })
+
+  const totalLiveValue = holdingValues.reduce((s, h) => s + (h.currentValue ?? parseFloat(h.position_size)), 0)
+  const totalGainLoss = hasMarketData ? totalLiveValue - totalCostBasis : null
+  const totalGainLossPct = totalGainLoss !== null && totalCostBasis > 0 ? totalGainLoss / totalCostBasis * 100 : null
+  const totalValue = totalLiveValue  // used for allocation %
+
+  // Sector breakdown (by cost basis for stable allocation %)
   const sectorMap = {}
   holdings.forEach(h => {
     const s = getSector(h.ticker)
@@ -141,12 +156,11 @@ export default function Holdings() {
   const sectors = Object.entries(sectorMap).sort((a, b) => b[1] - a[1])
 
   // Analytics
-  const dayChange = holdings.reduce((sum, h) => {
+  const dayChange = holdingValues.reduce((sum, h) => {
     const md = marketData[h.ticker]?.price
-    if (!md?.pct_change || !md?.close) return sum
+    if (!md?.pct_change || !md?.close || !h.shares) return sum
     const prevClose = md.close / (1 + md.pct_change / 100)
-    const shares = parseFloat(h.position_size) / md.close
-    return sum + (md.close - prevClose) * shares
+    return sum + (md.close - prevClose) * h.shares
   }, 0)
 
   const topMover = holdings
@@ -154,11 +168,11 @@ export default function Holdings() {
     .filter(x => x.pct != null)
     .sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct))[0]
 
-  const concentration = totalValue > 0
-    ? Math.max(...holdings.map(h => parseFloat(h.position_size) / totalValue * 100))
+  const concentration = totalCostBasis > 0
+    ? Math.max(...holdings.map(h => parseFloat(h.position_size) / totalCostBasis * 100))
     : 0
 
-  const sorted = [...holdings].sort((a, b) => {
+  const sorted = [...holdingValues].sort((a, b) => {
     if (sortBy === 'size')   return parseFloat(b.position_size) - parseFloat(a.position_size)
     if (sortBy === 'ticker') return a.ticker.localeCompare(b.ticker)
     if (sortBy === 'change') {
@@ -169,14 +183,17 @@ export default function Holdings() {
     return 0
   })
 
-  const hasMarketData = holdings.some(h => marketData[h.ticker]?.price?.close != null)
-
   return (
     <div>
       <div className="page-header">
         <div className="page-title">Holdings</div>
         <div className="page-subtitle">
-          {holdings.length} position{holdings.length !== 1 ? 's' : ''} · ${totalValue.toLocaleString()} total allocated
+          {holdings.length} position{holdings.length !== 1 ? 's' : ''} · ${totalCostBasis.toLocaleString()} cost basis
+          {totalGainLoss !== null && (
+            <span style={{ marginLeft: 8, color: totalGainLoss >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>
+              · {totalGainLoss >= 0 ? '+' : '−'}${Math.abs(totalGainLoss).toLocaleString(undefined, { maximumFractionDigits: 0 })} total P&L
+            </span>
+          )}
         </div>
       </div>
 
@@ -187,8 +204,12 @@ export default function Holdings() {
         <div className="stats-row" style={{ marginBottom: 20 }}>
           <div className="stat-card">
             <div className="stat-label">Portfolio Value</div>
-            <div className="stat-value">${(totalValue / 1000).toFixed(0)}K</div>
-            <div className="stat-sub">{holdings.length} active positions</div>
+            <div className="stat-value">${(totalLiveValue / 1000).toFixed(0)}K</div>
+            <div className="stat-sub" style={{ color: totalGainLoss > 0 ? 'var(--success)' : totalGainLoss < 0 ? 'var(--danger)' : undefined }}>
+              {totalGainLoss !== null
+                ? `${totalGainLoss >= 0 ? '+' : '−'}$${Math.abs(totalGainLoss).toLocaleString(undefined, { maximumFractionDigits: 0 })} (${totalGainLossPct >= 0 ? '+' : ''}${totalGainLossPct.toFixed(2)}%) vs cost`
+                : `${holdings.length} active positions`}
+            </div>
           </div>
           <div className="stat-card">
             <div className="stat-label">Est. Day Change</div>
@@ -376,8 +397,10 @@ export default function Holdings() {
                 <tr>
                   <th>Ticker</th>
                   <th>Sector</th>
-                  <th>Position</th>
-                  <th>Last Close</th>
+                  <th>Cost Basis</th>
+                  <th>Market Value</th>
+                  <th>Total P&L</th>
+                  <th>Last Price</th>
                   <th>Day Change</th>
                   <th>% of Portfolio</th>
                   <th></th>
@@ -388,9 +411,10 @@ export default function Holdings() {
                   const md = marketData[h.ticker]?.price
                   const pct = md?.pct_change
                   const close = md?.close
-                  const portfolioPct = totalValue > 0 ? (parseFloat(h.position_size) / totalValue * 100) : 0
+                  const portfolioPct = totalCostBasis > 0 ? (parseFloat(h.position_size) / totalCostBasis * 100) : 0
                   const sector = getSector(h.ticker)
                   const sColor = SECTOR_COLORS[sector] || SECTOR_COLORS.Other
+                  const glColor = h.gainLoss > 0 ? 'var(--success)' : h.gainLoss < 0 ? 'var(--danger)' : 'var(--text-2)'
 
                   return (
                     <tr key={h.id}>
@@ -405,9 +429,28 @@ export default function Holdings() {
                         }}>{sector}</span>
                       </td>
                       <td>
-                        <div style={{ fontWeight: 700, fontSize: 14 }}>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-2)' }}>
                           ${parseFloat(h.position_size).toLocaleString()}
                         </div>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 700, fontSize: 14 }}>
+                          {h.currentValue != null
+                            ? `$${h.currentValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                            : <span style={{ color: 'var(--text-2)' }}>—</span>}
+                        </div>
+                      </td>
+                      <td>
+                        {h.gainLoss != null ? (
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 13, color: glColor }}>
+                              {h.gainLoss >= 0 ? '+' : '−'}${Math.abs(h.gainLoss).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                            </div>
+                            <div style={{ fontSize: 11, color: glColor, opacity: 0.8 }}>
+                              {h.gainLossPct >= 0 ? '+' : ''}{h.gainLossPct.toFixed(2)}%
+                            </div>
+                          </div>
+                        ) : <span style={{ color: 'var(--text-2)' }}>—</span>}
                       </td>
                       <td>
                         {close != null

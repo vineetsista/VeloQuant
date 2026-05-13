@@ -105,6 +105,7 @@ class Holding(db.Model):
     advisor_id = db.Column(db.Integer, db.ForeignKey("advisors.id"), nullable=False)
     ticker = db.Column(db.String(20), nullable=False)
     position_size = db.Column(db.Numeric(15, 2), nullable=False)
+    shares = db.Column(db.Numeric(15, 6), nullable=True)
     added_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def to_dict(self):
@@ -113,6 +114,7 @@ class Holding(db.Model):
             "advisor_id": self.advisor_id,
             "ticker": self.ticker.upper(),
             "position_size": float(self.position_size),
+            "shares": float(self.shares) if self.shares is not None else None,
             "added_at": self.added_at.isoformat(),
         }
 

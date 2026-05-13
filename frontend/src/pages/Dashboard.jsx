@@ -145,7 +145,13 @@ export default function Dashboard() {
   const unread  = alerts.filter(a => !a.read).length
   const pending = emails.filter(e => !e.sent).length
   const date    = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
-  const totalPortfolio = holdings.reduce((s, h) => s + parseFloat(h.position_size), 0)
+  const totalCostBasis = holdings.reduce((s, h) => s + parseFloat(h.position_size), 0)
+  const totalPortfolio = holdings.reduce((s, h) => {
+    const close = marketData[h.ticker]?.price?.close
+    return s + (h.shares && close ? h.shares * close : parseFloat(h.position_size))
+  }, 0)
+  const portfolioGainLoss = Object.keys(marketData).length > 0 ? totalPortfolio - totalCostBasis : null
+  const portfolioGainLossPct = portfolioGainLoss !== null && totalCostBasis > 0 ? portfolioGainLoss / totalCostBasis * 100 : null
 
   const showVerifyBanner = advisor && advisor.email_verified === false && !advisor.is_legacy
 
@@ -264,8 +270,10 @@ export default function Dashboard() {
           <div className="stat-value" style={{ fontSize: totalPortfolio >= 1e6 ? 26 : 32 }}>
             {totalPortfolio > 0 ? `$${(totalPortfolio / 1000).toFixed(0)}K` : holdings.length}
           </div>
-          <div className="stat-sub">
-            {totalPortfolio > 0 ? `${holdings.length} position${holdings.length !== 1 ? 's' : ''}` : 'positions tracked'}
+          <div className="stat-sub" style={{ color: portfolioGainLoss > 0 ? 'var(--success)' : portfolioGainLoss < 0 ? 'var(--danger)' : undefined }}>
+            {portfolioGainLoss !== null
+              ? `${portfolioGainLoss >= 0 ? '+' : '−'}$${Math.abs(portfolioGainLoss).toLocaleString(undefined, { maximumFractionDigits: 0 })} (${portfolioGainLossPct >= 0 ? '+' : ''}${portfolioGainLossPct.toFixed(2)}%)`
+              : `${holdings.length} position${holdings.length !== 1 ? 's' : ''}`}
           </div>
         </div>
         <div className="stat-card">

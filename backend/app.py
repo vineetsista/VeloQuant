@@ -9,7 +9,7 @@ from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
 from models import db, Advisor, Holding, Briefing, FilingAlert, ClientEmail
 from data.edgar import get_recent_filings, get_cik
-from data.polygon import get_portfolio_market_data, get_overnight_change, get_prices_batch
+from data.polygon import get_portfolio_market_data, get_overnight_change, get_prices_batch, get_snapshot_batch
 from intelligence.briefing import generate_morning_briefing
 from intelligence.filing_analyzer import scan_and_analyze_filings
 from intelligence.email_generator import generate_client_email
@@ -88,6 +88,9 @@ def create_app():
             ))
             db.session.execute(db.text(
                 "ALTER TABLE advisors ADD COLUMN IF NOT EXISTS unsubscribe_token VARCHAR(64)"
+            ))
+            db.session.execute(db.text(
+                "ALTER TABLE holdings ADD COLUMN IF NOT EXISTS shares NUMERIC(15,6)"
             ))
             db.session.commit()
         except Exception:
@@ -281,6 +284,18 @@ def create_app():
     def get_holdings(advisor_id):
         if err := _assert_own(advisor_id): return err
         holdings = Holding.query.filter_by(advisor_id=advisor_id).all()
+        # Lazy backfill shares for holdings that predate this feature
+        needs_backfill = [h for h in holdings if h.shares is None]
+        if needs_backfill:
+            try:
+                prices = get_snapshot_batch([h.ticker for h in needs_backfill])
+                for h in needs_backfill:
+                    close = prices.get(h.ticker.upper(), {}).get('close')
+                    if close and close > 0:
+                        h.shares = float(h.position_size) / close
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
         return jsonify([h.to_dict() for h in holdings])
 
     @app.route("/api/advisors/<int:advisor_id>/holdings", methods=["POST"])
@@ -291,14 +306,27 @@ def create_app():
             return jsonify({"error": "ticker and position_size are required"}), 400
 
         ticker = data["ticker"].upper().strip()
+
+        def _set_shares(h):
+            try:
+                prices = get_snapshot_batch([ticker])
+                close = prices.get(ticker, {}).get('close')
+                if close and close > 0:
+                    h.shares = float(h.position_size) / close
+            except Exception:
+                pass
+
         existing = Holding.query.filter_by(advisor_id=advisor_id, ticker=ticker).first()
         if existing:
             existing.position_size = data["position_size"]
+            _set_shares(existing)
             db.session.commit()
             return jsonify(existing.to_dict())
 
         holding = Holding(advisor_id=advisor_id, ticker=ticker, position_size=data["position_size"])
         db.session.add(holding)
+        db.session.flush()
+        _set_shares(holding)
         db.session.commit()
         return jsonify(holding.to_dict()), 201
 
