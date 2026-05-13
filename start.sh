@@ -5,7 +5,7 @@ cd backend
 export FLASK_APP=app
 
 echo "==> Running database migrations..."
-python3 -m flask db upgrade
+flask db upgrade
 
 echo "==> Starting server..."
 exec gunicorn \
