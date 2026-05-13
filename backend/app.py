@@ -92,6 +92,9 @@ def create_app():
             db.session.execute(db.text(
                 "ALTER TABLE holdings ADD COLUMN IF NOT EXISTS shares NUMERIC(15,6)"
             ))
+            db.session.execute(db.text(
+                "ALTER TABLE filing_alerts ADD COLUMN IF NOT EXISTS edgar_url VARCHAR(512)"
+            ))
             db.session.commit()
         except Exception:
             db.session.rollback()

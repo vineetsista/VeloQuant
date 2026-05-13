@@ -120,12 +120,20 @@ def scan_and_analyze_filings(advisor_id: int, flask_app, days_back: int = 7) -> 
             except Exception as e:
                 insight = f"Analysis failed: {e}"
 
+            cik = filing.get("cik", "")
+            accession = filing.get("accession_number", "")
+            edgar_url = None
+            if cik and accession:
+                accession_clean = accession.replace("-", "")
+                edgar_url = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{accession_clean}/"
+
             alert = FilingAlert(
                 advisor_id=advisor_id,
                 ticker=ticker,
                 filing_type=form_type,
                 filing_date=filing_date,
                 key_insight=insight,
+                edgar_url=edgar_url,
                 read=False,
             )
             db.session.add(alert)

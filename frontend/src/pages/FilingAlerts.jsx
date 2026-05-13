@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 
 const TYPE_COLOR = { '10-K': 'var(--accent)', '10-Q': 'var(--accent-b)', '8-K': 'var(--warning)', 'DEF 14A': 'var(--success)' }
@@ -12,6 +13,7 @@ export default function FilingAlerts() {
   const [filter, setFilter] = useState('all')
   const [expanded, setExpanded] = useState(null)
   const [markingAll, setMarkingAll] = useState(false)
+  const navigate = useNavigate()
 
   useEffect(() => { load() }, [])
 
@@ -171,7 +173,11 @@ export default function FilingAlerts() {
                     transition: 'opacity 0.2s',
                     cursor: 'pointer',
                   }}
-                  onClick={() => setExpanded(expanded === a.id ? null : a.id)}
+                  onClick={() => {
+                    const opening = expanded !== a.id
+                    setExpanded(opening ? a.id : null)
+                    if (opening && !a.read) handleMarkRead(a.id)
+                  }}
                 >
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
                     <div style={{ flex: 1 }}>
@@ -200,16 +206,27 @@ export default function FilingAlerts() {
                           {expanded === a.id ? 'Show less ▲' : 'Read more ▼'}
                         </div>
                       )}
+                      {expanded === a.id && (
+                        <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }} onClick={ev => ev.stopPropagation()}>
+                          {a.edgar_url && (
+                            <a
+                              href={a.edgar_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ fontSize: 12, padding: '5px 12px', borderRadius: 8, border: '1px solid var(--border)', color: 'var(--text-2)', textDecoration: 'none', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                            >
+                              ↗ View on SEC EDGAR
+                            </a>
+                          )}
+                          <button
+                            style={{ fontSize: 12, padding: '5px 12px', borderRadius: 8, border: '1px solid var(--accent)', background: 'rgba(79,124,246,0.08)', color: 'var(--accent)', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}
+                            onClick={() => navigate(`/client-emails?ticker=${a.ticker}&event=${encodeURIComponent(`${a.ticker} filed a ${a.filing_type} on ${new Date(a.filing_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}. Key insight: ${a.key_insight.slice(0, 200)}`)}`)}
+                          >
+                            ✦ Draft Client Email
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    {!a.read && (
-                      <button
-                        className="btn btn-outline btn-sm"
-                        style={{ flexShrink: 0 }}
-                        onClick={ev => { ev.stopPropagation(); handleMarkRead(a.id) }}
-                      >
-                        Mark Read
-                      </button>
-                    )}
                   </div>
                 </div>
               ))}

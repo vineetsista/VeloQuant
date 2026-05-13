@@ -147,6 +147,7 @@ class FilingAlert(db.Model):
     filing_type = db.Column(db.String(20), nullable=False)  # 10-K, 10-Q, 8-K
     filing_date = db.Column(db.Date, nullable=False)
     key_insight = db.Column(db.Text, nullable=False)
+    edgar_url = db.Column(db.String(512), nullable=True)
     read = db.Column(db.Boolean, default=False, nullable=False)
 
     def to_dict(self):
@@ -157,6 +158,7 @@ class FilingAlert(db.Model):
             "filing_type": self.filing_type,
             "filing_date": self.filing_date.isoformat(),
             "key_insight": self.key_insight,
+            "edgar_url": self.edgar_url,
             "read": self.read,
         }
 

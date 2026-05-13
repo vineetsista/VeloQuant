@@ -292,6 +292,32 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Today's Movers */}
+      {holdings.length > 0 && Object.keys(marketData).length > 0 && (() => {
+        const movers = holdings
+          .map(h => ({ ticker: h.ticker, pct: marketData[h.ticker]?.price?.pct_change }))
+          .filter(m => m.pct != null)
+          .sort((a, b) => b.pct - a.pct)
+        if (!movers.length) return null
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, marginBottom: 20, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-2)', flexShrink: 0 }}>Today</span>
+            {movers.map(m => (
+              <span key={m.ticker} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '4px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700,
+                background: m.pct > 0 ? 'rgba(16,185,129,0.12)' : m.pct < 0 ? 'rgba(239,68,68,0.12)' : 'var(--surface-2)',
+                color: m.pct > 0 ? 'var(--success)' : m.pct < 0 ? 'var(--danger)' : 'var(--text-2)',
+                border: `1px solid ${m.pct > 0 ? 'rgba(16,185,129,0.25)' : m.pct < 0 ? 'rgba(239,68,68,0.25)' : 'var(--border)'}`,
+              }}>
+                <span style={{ fontSize: 10, opacity: 0.8 }}>{m.ticker}</span>
+                {m.pct > 0 ? '▲' : m.pct < 0 ? '▼' : '—'} {Math.abs(m.pct).toFixed(2)}%
+              </span>
+            ))}
+          </div>
+        )
+      })()}
+
       {/* Morning Briefing */}
       <div className="card card-glow">
         <div className="card-header">

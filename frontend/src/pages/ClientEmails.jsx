@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 
 function parseEmail(content) {
@@ -19,8 +20,19 @@ export default function ClientEmails() {
   const [showForm, setShowForm] = useState(false)
   const [copied, setCopied] = useState(false)
   const [filter, setFilter] = useState('all')
+  const [searchParams, setSearchParams] = useSearchParams()
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    // Pre-fill from filing alert shortcut
+    const ticker = searchParams.get('ticker')
+    const event = searchParams.get('event')
+    if (ticker || event) {
+      setGenForm(f => ({ ...f, ticker: ticker || '', event: event || '' }))
+      setShowForm(true)
+      setSearchParams({}, { replace: true })
+    }
+  }, [])
 
   async function load() {
     setLoading(true)
