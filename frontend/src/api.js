@@ -111,24 +111,13 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ advisor_id }),
   }),
-  adminGetStats:       () => req(`/admin/stats?advisor_id=${id()}`),
-  adminGetAdvisors:    () => req(`/admin/advisors?advisor_id=${id()}`),
-  adminGrantLegacy:    (tid) => req(`/admin/advisors/${tid}/grant-legacy`, {
-    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ advisor_id: id() }),
-  }),
-  adminSyncStripe:     (tid) => req(`/admin/advisors/${tid}/sync-stripe`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ advisor_id: id() }),
-  }),
-  adminDeleteAdvisor:  (tid) => req(`/admin/advisors/${tid}`, {
-    method: 'DELETE', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ advisor_id: id() }),
-  }),
-  adminTriggerJobs:    () => req('/admin/run-morning-jobs', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ advisor_id: id() }),
-  }),
+  adminGetStats:           () => req('/admin/stats'),
+  adminGetAdvisors:        () => req('/admin/advisors'),
+  adminGrantLegacy:        (tid) => req(`/admin/advisors/${tid}/grant-legacy`, { method: 'PATCH' }),
+  adminSyncStripe:         (tid) => req(`/admin/advisors/${tid}/sync-stripe`, { method: 'POST' }),
+  adminDeleteAdvisor:      (tid) => req(`/admin/advisors/${tid}`, { method: 'DELETE' }),
+  adminTriggerJobs:        () => req('/admin/run-morning-jobs', { method: 'POST' }),
+  adminGenerateBriefingFor: (tid) => req(`/admin/advisors/${tid}/generate-briefing`, { method: 'POST' }),
   demoGenerate: (tickers) => req('/demo/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

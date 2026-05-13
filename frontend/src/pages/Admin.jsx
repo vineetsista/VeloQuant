@@ -37,19 +37,69 @@ function SectionLabel({ children }) {
   )
 }
 
+function SignupChart({ data }) {
+  const max = Math.max(...data.map(d => d.count), 1)
+  const W = 100, H = 48
+  const pts = data.map((d, i) => {
+    const x = (i / (data.length - 1)) * W
+    const y = H - (d.count / max) * (H - 4) - 2
+    return `${x},${y}`
+  }).join(' ')
+
+  const total = data.reduce((s, d) => s + d.count, 0)
+  const recent7 = data.slice(-7).reduce((s, d) => s + d.count, 0)
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
+      <div style={{ flex: 1 }}>
+        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 56, display: 'block', overflow: 'visible' }}>
+          <defs>
+            <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#4f7cf6" stopOpacity="0.18" />
+              <stop offset="100%" stopColor="#4f7cf6" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <polyline points={pts} fill="none" stroke="#4f7cf6" strokeWidth="1.5" strokeLinejoin="round" />
+          {data.map((d, i) => {
+            if (d.count === 0) return null
+            const x = (i / (data.length - 1)) * W
+            const y = H - (d.count / max) * (H - 4) - 2
+            return <circle key={i} cx={x} cy={y} r="2" fill="#4f7cf6" />
+          })}
+        </svg>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+          <span style={{ fontSize: 10, color: 'var(--text-2)' }}>{data[0]?.date.slice(5)}</span>
+          <span style={{ fontSize: 10, color: 'var(--text-2)' }}>{data[data.length - 1]?.date.slice(5)}</span>
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 28, flexShrink: 0 }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)' }}>{recent7}</div>
+          <div style={{ fontSize: 10, color: 'var(--text-2)', marginTop: 2 }}>Last 7 days</div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 24, fontWeight: 800 }}>{total}</div>
+          <div style={{ fontSize: 10, color: 'var(--text-2)', marginTop: 2 }}>Last 30 days</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Admin() {
-  const [tab, setTab]             = useState('overview')
-  const [stats, setStats]         = useState(null)
-  const [users, setUsers]         = useState([])
-  const [loading, setLoading]     = useState(true)
-  const [error, setError]         = useState(null)
-  const [search, setSearch]       = useState('')
-  const [statusFilter, setFilter] = useState('all')
-  const [sortBy, setSortBy]       = useState('joined')
-  const [busy, setBusy]           = useState({})
-  const [confirm, setConfirm]     = useState(null)
-  const [jobMsg, setJobMsg]       = useState(null)
+  const [tab, setTab]               = useState('overview')
+  const [stats, setStats]           = useState(null)
+  const [users, setUsers]           = useState([])
+  const [loading, setLoading]       = useState(true)
+  const [error, setError]           = useState(null)
+  const [search, setSearch]         = useState('')
+  const [statusFilter, setFilter]   = useState('all')
+  const [sortBy, setSortBy]         = useState('joined')
+  const [busy, setBusy]             = useState({})
+  const [confirm, setConfirm]       = useState(null)
+  const [jobMsg, setJobMsg]         = useState(null)
   const [jobRunning, setJobRunning] = useState(false)
+  const [briefingMsg, setBriefingMsg] = useState({})
   const navigate = useNavigate()
   const myId = parseInt(getAdvisorId())
 
@@ -106,6 +156,20 @@ export default function Admin() {
       setJobMsg({ ok: true, text: 'Jobs triggered. Check Flask terminal for progress.' })
     } catch (e) { setJobMsg({ ok: false, text: e.message }) }
     finally { setJobRunning(false) }
+  }
+
+  async function handleGenerateBriefingFor(u) {
+    setBusyKey(`brief_${u.id}`, true)
+    setBriefingMsg(p => ({ ...p, [u.id]: null }))
+    try {
+      await api.adminGenerateBriefingFor(u.id)
+      setBriefingMsg(p => ({ ...p, [u.id]: { ok: true } }))
+      // Refresh user list to update briefing count
+      const updated = await api.adminGetAdvisors()
+      setUsers(updated)
+    } catch (e) {
+      setBriefingMsg(p => ({ ...p, [u.id]: { ok: false, text: e.message } }))
+    } finally { setBusyKey(`brief_${u.id}`, false) }
   }
 
   if (loading) return <div className="loading"><div className="spin" /><span>Loading admin console...</span></div>
@@ -193,7 +257,7 @@ export default function Admin() {
           </div>
 
           <SectionLabel>Platform Activity</SectionLabel>
-          <div className="stats-row">
+          <div className="stats-row" style={{ marginBottom: 24 }}>
             <Metric label="Total Briefings" value={stats.total_briefings} sub="AI reports generated" />
             <Metric label="Filing Alerts" value={stats.total_alerts} sub="SEC insights delivered" />
             <Metric label="Client Emails" value={stats.total_emails} sub="Drafts generated" />
@@ -203,6 +267,15 @@ export default function Admin() {
               sub="Engagement metric"
             />
           </div>
+
+          {stats.signup_trend && (
+            <>
+              <SectionLabel>Signups — Last 30 Days</SectionLabel>
+              <div className="card" style={{ padding: '20px 24px' }}>
+                <SignupChart data={stats.signup_trend} />
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -252,6 +325,7 @@ export default function Admin() {
                   <th>Status</th>
                   <th style={{ textAlign: 'center' }}>Holdings</th>
                   <th style={{ textAlign: 'center' }}>Briefings</th>
+                  <th style={{ textAlign: 'center' }}>Email</th>
                   <th>Last Active</th>
                   <th>Joined</th>
                   <th>Actions</th>
@@ -288,6 +362,11 @@ export default function Admin() {
                       </td>
                       <td style={{ textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{u.holding_count ?? 0}</td>
                       <td style={{ textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{u.briefing_count ?? 0}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        <span title={u.briefing_email_enabled === false ? 'Unsubscribed' : 'Email on'} style={{ fontSize: 14 }}>
+                          {u.briefing_email_enabled === false ? '🔕' : '✉'}
+                        </span>
+                      </td>
                       <td style={{ fontSize: 12 }}>
                         {u.last_briefing_at
                           ? new Date(u.last_briefing_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -298,6 +377,24 @@ export default function Admin() {
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                          {u.holding_count > 0 && (
+                            <div>
+                              <button
+                                className="btn btn-outline btn-sm"
+                                onClick={() => handleGenerateBriefingFor(u)}
+                                disabled={!!busy[`brief_${u.id}`]}
+                                style={{ fontSize: 10, whiteSpace: 'nowrap', color: 'var(--accent)', borderColor: 'rgba(79,124,246,0.4)' }}
+                                title="Generate a briefing for this user"
+                              >
+                                {busy[`brief_${u.id}`] ? '...' : '◆ Brief'}
+                              </button>
+                              {briefingMsg[u.id] && (
+                                <div style={{ fontSize: 9, marginTop: 2, color: briefingMsg[u.id].ok ? 'var(--success)' : 'var(--danger)' }}>
+                                  {briefingMsg[u.id].ok ? '✓ done' : briefingMsg[u.id].text?.slice(0, 24)}
+                                </div>
+                              )}
+                            </div>
+                          )}
                           <button
                             className="btn btn-outline btn-sm"
                             onClick={() => handleGrantLegacy(u)}

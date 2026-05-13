@@ -753,24 +753,32 @@ def create_app():
     # ── Admin ─────────────────────────────────────────────────────────────────
 
     def _require_admin():
-        advisor_id = request.args.get('advisor_id') or (request.get_json(silent=True) or {}).get('advisor_id')
-        if not advisor_id:
+        if not g.advisor.is_admin():
             return None, (jsonify({"error": "Unauthorized"}), 403)
-        admin = Advisor.query.get(int(advisor_id))
-        if not admin or not admin.is_admin():
-            return None, (jsonify({"error": "Unauthorized"}), 403)
-        return admin, None
+        return g.advisor, None
 
     @app.route("/api/admin/stats")
     def admin_stats():
         _, err = _require_admin()
         if err: return err
+        from datetime import datetime, timezone, timedelta
         advisors = Advisor.query.all()
         active   = sum(1 for a in advisors if a.subscription_status == 'active')
         trialing = sum(1 for a in advisors if a.subscription_status == 'trialing')
         legacy   = sum(1 for a in advisors if a.is_legacy())
         past_due = sum(1 for a in advisors if a.subscription_status == 'past_due')
         canceled = sum(1 for a in advisors if a.subscription_status == 'canceled')
+        # Signup trend: signups per day for the last 30 days
+        now = datetime.now(timezone.utc)
+        trend = {}
+        for i in range(29, -1, -1):
+            d = (now - timedelta(days=i)).strftime("%Y-%m-%d")
+            trend[d] = 0
+        for a in advisors:
+            if a.created_at:
+                d = a.created_at.strftime("%Y-%m-%d")
+                if d in trend:
+                    trend[d] += 1
         return jsonify({
             "total_users":      len(advisors),
             "active":           active,
@@ -783,6 +791,7 @@ def create_app():
             "total_briefings":  Briefing.query.count(),
             "total_alerts":     FilingAlert.query.count(),
             "total_emails":     ClientEmail.query.count(),
+            "signup_trend":     [{"date": d, "count": c} for d, c in trend.items()],
         })
 
     @app.route("/api/admin/advisors")
@@ -800,6 +809,21 @@ def create_app():
             d['last_briefing_at'] = last.generated_at.isoformat() if last else None
             result.append(d)
         return jsonify(result)
+
+    @app.route("/api/admin/advisors/<int:target_id>/generate-briefing", methods=["POST"])
+    def admin_generate_briefing_for(target_id):
+        _, err = _require_admin()
+        if err: return err
+        target = db.get_or_404(Advisor, target_id)
+        holdings = Holding.query.filter_by(advisor_id=target_id).all()
+        if not holdings:
+            return jsonify({"error": "User has no holdings"}), 400
+        try:
+            from intelligence.briefing import generate_and_save_briefing
+            briefing_dict = generate_and_save_briefing(target_id, app)
+            return jsonify({"status": "generated", "briefing_id": briefing_dict["id"]})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
 
     @app.route("/api/admin/advisors/<int:target_id>/grant-legacy", methods=["PATCH"])
     def admin_grant_legacy(target_id):
