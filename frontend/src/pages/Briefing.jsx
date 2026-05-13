@@ -71,6 +71,18 @@ export default function Briefing() {
     }
   }
 
+  function handleDownload() {
+    if (!selected) return
+    const date = new Date(selected.generated_at).toISOString().slice(0, 10)
+    const blob = new Blob([selected.content], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `briefing-${date}.txt`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   function handlePrint() {
     const w = window.open('', '_blank')
     const date = new Date(selected.generated_at).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
@@ -256,8 +268,11 @@ export default function Briefing() {
                   >
                     {selected?.delivered ? '✓ Emailed' : emailing ? 'Sending...' : '✉ Email me'}
                   </button>
+                  <button onClick={handleDownload} style={{ fontSize: 12, padding: '5px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
+                    ↓ Download
+                  </button>
                   <button onClick={handlePrint} style={{ fontSize: 12, padding: '5px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
-                    ⎙ Print
+                    ⎙ Print / PDF
                   </button>
                 </div>
               </div>

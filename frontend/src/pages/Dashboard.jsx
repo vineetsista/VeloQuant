@@ -149,6 +149,52 @@ export default function Dashboard() {
 
   const showVerifyBanner = advisor && advisor.email_verified === false && !advisor.is_legacy
 
+  const todayStr = new Date().toDateString()
+  const briefingIsToday = briefing && new Date(briefing.generated_at).toDateString() === todayStr
+
+  // First-time empty state
+  if (holdings.length === 0) {
+    return (
+      <div>
+        <div className="page-header">
+          <div className="page-title">{advisor?.name ? `Welcome, ${advisor.name.split(' ')[0]}` : 'Welcome'}</div>
+          <div className="page-subtitle">{advisor?.firm_name} · {date}</div>
+        </div>
+        {showVerifyBanner && (
+          <div style={{ background: 'linear-gradient(90deg, rgba(79,124,246,0.15), rgba(6,182,212,0.10))', border: '1px solid rgba(79,124,246,0.3)', borderRadius: 10, padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 12 }}>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>✉ Check your inbox to verify your email address</span>
+            <button className="btn btn-outline" style={{ fontSize: 12, padding: '6px 14px' }} onClick={() => api.resendVerification(advisor.email).catch(() => {})}>Resend</button>
+          </div>
+        )}
+        <div className="card card-glow" style={{ padding: '40px 48px', maxWidth: 640 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 12 }}>Getting Started</div>
+          <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.03em', marginBottom: 8 }}>
+            Set up your morning briefings
+          </div>
+          <div style={{ fontSize: 14, color: 'var(--text-2)', lineHeight: 1.7, marginBottom: 32 }}>
+            Your platform is ready. Complete these three steps to start receiving personalized intelligence every morning.
+          </div>
+          {[
+            { n: '1', title: 'Add your holdings', desc: 'Enter the tickers your clients hold. Takes 60 seconds.', cta: 'Add Holdings →', path: '/holdings', done: false },
+            { n: '2', title: 'Generate your first briefing', desc: 'See exactly what you\'ll receive every morning — AI analysis of your specific portfolio.', cta: null, done: false },
+            { n: '3', title: 'Briefings arrive at 7:30am ET', desc: 'Every weekday, your briefing lands before market open. No action needed after setup.', cta: null, done: false },
+          ].map((step, i) => (
+            <div key={step.n} style={{ display: 'flex', gap: 20, marginBottom: i < 2 ? 24 : 0, paddingBottom: i < 2 ? 24 : 0, borderBottom: i < 2 ? '1px solid var(--border)' : 'none' }}>
+              <div style={{ width: 32, height: 32, borderRadius: '50%', background: i === 0 ? 'linear-gradient(135deg, var(--accent), var(--accent-b))' : 'var(--surface-2)', border: i === 0 ? 'none' : '1px solid var(--border)', color: i === 0 ? '#fff' : 'var(--text-2)', fontSize: 14, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{step.n}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4, color: i === 0 ? 'var(--text)' : 'var(--text-2)' }}>{step.title}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.6, marginBottom: step.cta ? 12 : 0 }}>{step.desc}</div>
+                {step.cta && (
+                  <button className="btn btn-primary" style={{ fontSize: 13 }} onClick={() => navigate(step.path)}>{step.cta}</button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div>
       {showVerifyBanner && (
@@ -180,10 +226,21 @@ export default function Dashboard() {
 
       {/* Header */}
       <div className="page-header">
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
             <div className="page-title">{advisor?.name}</div>
-            <div className="page-subtitle">{advisor?.firm_name} · {date}</div>
+            <div className="page-subtitle" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span>{advisor?.firm_name} · {date}</span>
+              {briefingIsToday ? (
+                <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 10, background: 'rgba(16,185,129,0.15)', color: 'var(--success)', letterSpacing: '0.04em' }}>
+                  ◆ Briefing ready · {new Date(briefing.generated_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                </span>
+              ) : (
+                <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 10px', borderRadius: 10, background: 'rgba(79,124,246,0.1)', color: 'var(--accent)', letterSpacing: '0.04em' }}>
+                  ⏰ Next briefing at 7:30am ET
+                </span>
+              )}
+            </div>
           </div>
           <button
             className="btn btn-primary"

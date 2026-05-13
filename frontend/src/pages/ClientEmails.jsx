@@ -62,6 +62,13 @@ export default function ClientEmails() {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  function handleMailto() {
+    if (!selected) return
+    const { subject, body } = parseEmail(selected.draft_content)
+    const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+    window.open(mailto, '_self')
+  }
+
   if (loading) return <div className="loading"><div className="spin" /><span>Loading client emails...</span></div>
 
   const pending = emails.filter(e => !e.sent).length
@@ -226,6 +233,13 @@ export default function ClientEmails() {
                       style={{ fontSize: 12, padding: '5px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: copied === 'full' ? 'var(--success)' : 'var(--text-2)', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}
                     >
                       {copied === 'full' ? '✓ Copied' : '⎘ Copy with Subject'}
+                    </button>
+                    <button
+                      onClick={handleMailto}
+                      style={{ fontSize: 12, padding: '5px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}
+                      title="Open in your email client"
+                    >
+                      ✉ Open in Mail
                     </button>
                     {!selected.sent && (
                       <button className="btn btn-primary btn-sm" onClick={() => handleMarkSent(selected.id)} style={{ fontSize: 12 }}>

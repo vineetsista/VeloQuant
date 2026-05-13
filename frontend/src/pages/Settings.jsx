@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api, clearAdvisorId, getAdvisorId } from '../api'
+import { api, clearAdvisorId, getAdvisorId, getApiKey } from '../api'
 import { useToast } from '../components/Toast'
 
 const TAB = { PROFILE: 'profile', SUBSCRIPTION: 'subscription', SECURITY: 'security', NOTIFICATIONS: 'notifications' }
@@ -45,6 +45,8 @@ export default function Settings() {
   const [showPw, setShowPw] = useState(false)
   const [pwSaving, setPwSaving] = useState(false)
   const [pwMsg, setPwMsg] = useState(null)
+  const [showApiKey, setShowApiKey] = useState(false)
+  const [apiKeyCopied, setApiKeyCopied] = useState(false)
 
   // Danger zone
   const [deleteConfirm, setDeleteConfirm] = useState('')
@@ -415,6 +417,50 @@ export default function Settings() {
       {/* ── SECURITY TAB ── */}
       {tab === TAB.SECURITY && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="card card-glow" style={{ padding: '8px 28px 28px' }}>
+            <Section title="API Key">
+              <FieldRow
+                label="Your API Key"
+                hint="Used to authenticate requests to the RIA Intelligence API. Keep this secret — treat it like a password."
+              >
+                <div>
+                  <div style={{ position: 'relative', display: 'flex', gap: 8 }}>
+                    <input
+                      className="form-input"
+                      readOnly
+                      value={showApiKey ? (getApiKey() || '—') : '•'.repeat(32)}
+                      style={{ flex: 1, fontFamily: 'monospace', fontSize: 12, letterSpacing: showApiKey ? 0 : '0.06em' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKey(v => !v)}
+                      style={{ padding: '0 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit', flexShrink: 0 }}
+                    >
+                      {showApiKey ? 'Hide' : 'Reveal'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const key = getApiKey()
+                        if (!key) return
+                        navigator.clipboard.writeText(key).then(() => {
+                          setApiKeyCopied(true)
+                          setTimeout(() => setApiKeyCopied(false), 2000)
+                        })
+                      }}
+                      style={{ padding: '0 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: apiKeyCopied ? 'var(--success)' : 'var(--text-2)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit', flexShrink: 0 }}
+                    >
+                      {apiKeyCopied ? '✓ Copied' : '⎘ Copy'}
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 6 }}>
+                    To regenerate your API key, contact support at <a href="mailto:ria.intelligence.briefings@gmail.com" style={{ color: 'var(--accent)' }}>ria.intelligence.briefings@gmail.com</a>
+                  </div>
+                </div>
+              </FieldRow>
+            </Section>
+          </div>
+
           <div className="card card-glow" style={{ padding: '8px 28px 28px' }}>
             <Section title="Change Password">
               <form onSubmit={changePassword}>
