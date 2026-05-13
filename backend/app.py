@@ -1116,9 +1116,16 @@ def create_app():
 
         obj = event["data"]["object"]
 
+        def _sg(o, key, default=None):
+            try:
+                v = o[key]
+                return v if v is not None else default
+            except Exception:
+                return getattr(o, key, default)
+
         if event["type"] == "checkout.session.completed":
-            sub_id = obj.get("subscription")
-            customer_id = obj.get("customer")
+            sub_id = _sg(obj, "subscription")
+            customer_id = _sg(obj, "customer")
             if sub_id and customer_id:
                 advisor = Advisor.query.filter_by(stripe_customer_id=customer_id).first()
                 if advisor:
@@ -1132,18 +1139,19 @@ def create_app():
                     db.session.commit()
 
         elif event["type"] in ("customer.subscription.updated", "customer.subscription.deleted"):
-            customer_id = obj.get("customer")
+            customer_id = _sg(obj, "customer")
             advisor = Advisor.query.filter_by(stripe_customer_id=customer_id).first()
             if advisor:
-                advisor.subscription_status = obj.get("status")
-                advisor.stripe_subscription_id = obj.get("id")
-                if obj.get("trial_end"):
+                advisor.subscription_status = _sg(obj, "status")
+                advisor.stripe_subscription_id = _sg(obj, "id")
+                trial_end = _sg(obj, "trial_end")
+                if trial_end:
                     from datetime import datetime, timezone
-                    advisor.trial_ends_at = datetime.fromtimestamp(obj["trial_end"], tz=timezone.utc)
+                    advisor.trial_ends_at = datetime.fromtimestamp(trial_end, tz=timezone.utc)
                 db.session.commit()
 
         elif event["type"] == "invoice.payment_failed":
-            customer_id = obj.get("customer")
+            customer_id = _sg(obj, "customer")
             advisor = Advisor.query.filter_by(stripe_customer_id=customer_id).first()
             if advisor:
                 advisor.subscription_status = "past_due"
