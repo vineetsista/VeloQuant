@@ -53,7 +53,7 @@ def create_app():
         'health', 'create_advisor', 'get_advisor_by_email',
         'verify_email', 'resend_verification', 'forgot_password',
         'reset_password', 'unsubscribe', 'stripe_webhook', 'demo_generate',
-        'get_market_indices', 'contact', 'static',
+        'get_market_indices', 'contact', 'static', 'serve_react',
     }
 
     @app.before_request
