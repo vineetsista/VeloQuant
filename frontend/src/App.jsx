@@ -16,6 +16,7 @@ import VerifyEmail from './pages/VerifyEmail'
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsOfService from './pages/TermsOfService'
 import Disclaimer from './pages/Disclaimer'
+import Contact from './pages/Contact'
 import MarketBar from './components/MarketBar'
 import { getAdvisorId, clearAdvisorId, api } from './api'
 
@@ -75,6 +76,9 @@ function AppLayout() {
   }
   if (location.pathname === '/disclaimer') {
     return <Routes><Route path="/disclaimer" element={<Disclaimer />} /></Routes>
+  }
+  if (location.pathname === '/contact') {
+    return <Routes><Route path="/contact" element={<Contact />} /></Routes>
   }
 
   // Landing page for logged-out visitors

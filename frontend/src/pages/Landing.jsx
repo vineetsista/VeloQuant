@@ -428,6 +428,7 @@ export default function Landing() {
             { label: 'Privacy Policy', path: '/privacy' },
             { label: 'Terms of Service', path: '/terms' },
             { label: 'Disclaimer', path: '/disclaimer' },
+            { label: 'Contact', path: '/contact' },
           ].map(({ label, path }) => (
             <button
               key={path}

@@ -53,7 +53,7 @@ def create_app():
         'health', 'create_advisor', 'get_advisor_by_email',
         'verify_email', 'resend_verification', 'forgot_password',
         'reset_password', 'stripe_webhook', 'demo_generate',
-        'get_market_indices', 'static',
+        'get_market_indices', 'contact', 'static',
     }
 
     @app.before_request
@@ -218,6 +218,36 @@ def create_app():
         advisor.reset_token_expires = None
         db.session.commit()
         return jsonify({"message": "Password updated successfully"})
+
+    @app.route("/api/contact", methods=["POST"])
+    @limiter.limit("10 per hour")
+    def contact():
+        import sendgrid
+        from sendgrid.helpers.mail import Mail
+        data = request.get_json() or {}
+        name    = data.get("name", "").strip()
+        email   = data.get("email", "").strip()
+        subject = data.get("subject", "").strip()
+        message = data.get("message", "").strip()
+        if not name or not email or not subject or not message:
+            return jsonify({"error": "All fields are required"}), 400
+        sg_key  = os.getenv("SENDGRID_API_KEY")
+        to_addr = os.getenv("SUPPORT_EMAIL", os.getenv("SENDGRID_FROM_EMAIL", ""))
+        if sg_key and to_addr:
+            try:
+                sg = sendgrid.SendGridAPIClient(api_key=sg_key)
+                body = f"From: {name} <{email}>\nSubject: {subject}\n\n{message}"
+                mail = Mail(
+                    from_email=os.getenv("SENDGRID_FROM_EMAIL", to_addr),
+                    to_emails=to_addr,
+                    subject=f"[RIA Support] {subject} — {name}",
+                    plain_text_content=body,
+                )
+                mail.reply_to = email
+                sg.send(mail)
+            except Exception as exc:
+                logging.error("Contact email failed: %s", exc)
+        return jsonify({"message": "Message received"})
 
     def _require_subscription(advisor):
         """Return a 402 error response if advisor has no active subscription, else None."""
