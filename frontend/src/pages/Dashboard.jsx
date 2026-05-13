@@ -3,6 +3,57 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import BriefingRenderer from '../components/BriefingRenderer'
 
+const CHART_COLORS = ['#4f7cf6','#06b6d4','#10d97b','#f59e0b','#8b5cf6','#ec4899','#f97316','#ef4444']
+
+function AllocationChart({ holdings }) {
+  const total = holdings.reduce((s, h) => s + parseFloat(h.position_size || 0), 0)
+  if (!total || holdings.length === 0) return null
+
+  const SIZE = 120, CX = 60, CY = 60, R = 52, IR = 33
+  const toRad = d => (d * Math.PI) / 180
+  let cum = -90
+
+  const slices = holdings.map((h, i) => {
+    const pct = parseFloat(h.position_size || 0) / total
+    const sweep = pct * 360
+    const color = CHART_COLORS[i % CHART_COLORS.length]
+    if (holdings.length === 1) return { type: 'circle', color, ticker: h.ticker, pct }
+    const start = cum; cum += sweep; const end = cum
+    const la = sweep > 180 ? 1 : 0
+    const [x1,y1] = [CX+R*Math.cos(toRad(start)), CY+R*Math.sin(toRad(start))]
+    const [x2,y2] = [CX+R*Math.cos(toRad(end)),   CY+R*Math.sin(toRad(end))]
+    const [ix1,iy1] = [CX+IR*Math.cos(toRad(start)), CY+IR*Math.sin(toRad(start))]
+    const [ix2,iy2] = [CX+IR*Math.cos(toRad(end)),   CY+IR*Math.sin(toRad(end))]
+    return { type:'path', color, ticker:h.ticker, pct,
+      d:`M${x1.toFixed(1)},${y1.toFixed(1)} A${R},${R} 0 ${la},1 ${x2.toFixed(1)},${y2.toFixed(1)} L${ix2.toFixed(1)},${iy2.toFixed(1)} A${IR},${IR} 0 ${la},0 ${ix1.toFixed(1)},${iy1.toFixed(1)}Z` }
+  })
+
+  return (
+    <div style={{ display:'flex', alignItems:'center', gap:20, paddingBottom:18, marginBottom:12, borderBottom:'1px solid var(--border)' }}>
+      <svg width={SIZE} height={SIZE} style={{ flexShrink:0 }}>
+        {slices.map((s,i) => s.type==='circle'
+          ? <circle key={i} cx={CX} cy={CY} r={(R+IR)/2} fill="none" stroke={s.color} strokeWidth={R-IR} />
+          : <path key={i} d={s.d} fill={s.color} />
+        )}
+      </svg>
+      <div style={{ flex:1, display:'flex', flexDirection:'column', gap:6 }}>
+        {slices.map((s,i) => (
+          <div key={i} style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <div style={{ width:8, height:8, borderRadius:2, background:s.color, flexShrink:0 }} />
+            <span style={{ fontSize:11, fontWeight:800, color:'var(--text)', letterSpacing:'0.05em', minWidth:38 }}>{s.ticker}</span>
+            <div style={{ flex:1, height:2, background:'var(--border)', borderRadius:1, overflow:'hidden' }}>
+              <div style={{ width:`${(s.pct*100).toFixed(1)}%`, height:'100%', background:s.color }} />
+            </div>
+            <span style={{ fontSize:11, color:'var(--text-2)', fontVariantNumeric:'tabular-nums', fontWeight:600, minWidth:28, textAlign:'right' }}>
+              {(s.pct*100).toFixed(0)}%
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function BriefingActions({ briefing }) {
   const [copied, setCopied] = useState(false)
   const [emailing, setEmailing] = useState(false)
@@ -209,7 +260,9 @@ export default function Dashboard() {
           {holdings.length === 0 ? (
             <div className="empty" style={{ padding: '24px 0' }}>No holdings yet.</div>
           ) : (
-            holdings.map(h => {
+            <>
+            <AllocationChart holdings={holdings} />
+            {holdings.map(h => {
               const md = marketData[h.ticker]?.price
               const pct = md?.pct_change
               const close = md?.close
@@ -237,7 +290,8 @@ export default function Dashboard() {
                   </div>
                 </div>
               )
-            })
+            })}
+            </>
           )}
         </div>
 

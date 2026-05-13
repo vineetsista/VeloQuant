@@ -29,6 +29,15 @@ const FEATURES = [
   },
 ]
 
+const FAQS = [
+  { q: 'How is this different from Bloomberg or FactSet?', a: 'Bloomberg gives you raw data — you still have to synthesize it into insights. RIA Intelligence takes your specific holdings, pulls the data automatically overnight, and hands you a briefing written for your book of business. It\'s the analyst you can\'t afford to hire.' },
+  { q: 'How does it know what to monitor?', a: 'You enter your holdings as tickers. The platform monitors SEC EDGAR for 10-K, 10-Q, and 8-K filings, fetches overnight price movements, and scans financial news — all filtered to the positions you actually hold.' },
+  { q: 'What time does the briefing arrive?', a: 'Briefings are generated and sent to your email by 7:30am ET every weekday. You can also generate a manual briefing at any time from the dashboard.' },
+  { q: 'Is my client data secure?', a: 'You only enter stock tickers — not client names or account details. All data is encrypted in transit and at rest. The platform never has access to your CRM or custodian data.' },
+  { q: 'Can I cancel anytime?', a: 'Yes. Cancel before your trial ends and you\'ll never be charged. After subscribing, cancel anytime and retain access through the end of your billing period.' },
+  { q: 'Does this work for ETF-heavy or model portfolio advisors?', a: 'Absolutely. Enter ETF tickers directly. The briefing covers price movements, distribution announcements, and SEC filings for the fund itself — tailored to your actual allocation.' },
+]
+
 const STEPS = [
   { n: '01', title: 'Add your holdings', desc: 'Enter the tickers your clients commonly hold. Takes 60 seconds.' },
   { n: '02', title: 'We monitor everything', desc: 'Overnight: prices, news, SEC filings — all fetched and analyzed automatically.' },
@@ -36,6 +45,7 @@ const STEPS = [
 ]
 
 export default function Landing() {
+  const [openFaq, setOpenFaq] = useState(null)
   const [tickers, setTickers] = useState('')
   const [loading, setLoading] = useState(false)
   const [msgIdx, setMsgIdx] = useState(0)
@@ -366,6 +376,34 @@ export default function Landing() {
           <div style={{ textAlign: 'center', marginTop: 14, fontSize: 12, color: 'var(--text-2)' }}>
             No commitment. Cancel before your trial ends and pay nothing.
           </div>
+        </div>
+      </section>
+
+      {/* ── FAQ ── */}
+      <section style={{ padding: '80px 24px', maxWidth: 720, margin: '0 auto' }}>
+        <div style={{ textAlign: 'center', marginBottom: 48 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 12 }}>FAQ</div>
+          <h2 style={{ fontSize: 'clamp(24px, 3vw, 38px)', fontWeight: 900, letterSpacing: '-0.03em', margin: 0 }}>
+            Common questions
+          </h2>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {FAQS.map((faq, i) => (
+            <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', transition: 'border-color 0.15s' }}>
+              <button
+                onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                style={{ width: '100%', background: 'none', border: 'none', padding: '18px 22px', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, fontFamily: 'inherit' }}
+              >
+                <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text)', lineHeight: 1.4 }}>{faq.q}</span>
+                <span style={{ color: 'var(--accent)', fontSize: 22, lineHeight: 1, flexShrink: 0, fontWeight: 300 }}>{openFaq === i ? '−' : '+'}</span>
+              </button>
+              {openFaq === i && (
+                <div style={{ padding: '0 22px 20px', fontSize: 14, color: 'var(--text-2)', lineHeight: 1.8, borderTop: '1px solid var(--border)' }}>
+                  <div style={{ paddingTop: 16 }}>{faq.a}</div>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       </section>
 
