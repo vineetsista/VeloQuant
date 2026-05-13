@@ -571,10 +571,11 @@ def create_app():
                 if advisor:
                     sub = stripe.Subscription.retrieve(sub_id)  # type: ignore
                     advisor.stripe_subscription_id = sub_id
-                    advisor.subscription_status = sub["status"]
-                    if sub.get("trial_end"):
+                    advisor.subscription_status = sub.status
+                    trial_end = getattr(sub, 'trial_end', None)
+                    if trial_end:
                         from datetime import datetime, timezone
-                        advisor.trial_ends_at = datetime.fromtimestamp(sub["trial_end"], tz=timezone.utc)
+                        advisor.trial_ends_at = datetime.fromtimestamp(trial_end, tz=timezone.utc)
                     db.session.commit()
 
         elif event["type"] in ("customer.subscription.updated", "customer.subscription.deleted"):
