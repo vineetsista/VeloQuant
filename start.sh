@@ -2,10 +2,6 @@
 set -e
 
 cd backend
-export FLASK_APP=app
-
-echo "==> Running database migrations..."
-flask db upgrade
 
 echo "==> Starting server..."
 exec gunicorn \
