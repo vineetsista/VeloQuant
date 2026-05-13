@@ -80,6 +80,7 @@ class Advisor(db.Model):
     briefings = db.relationship("Briefing", backref="advisor", lazy=True, cascade="all, delete-orphan")
     filing_alerts = db.relationship("FilingAlert", backref="advisor", lazy=True, cascade="all, delete-orphan")
     client_emails = db.relationship("ClientEmail", backref="advisor", lazy=True, cascade="all, delete-orphan")
+    price_alerts = db.relationship("PriceAlert", backref="advisor", lazy=True, cascade="all, delete-orphan")
 
     def to_dict(self):
         return {
@@ -182,5 +183,34 @@ class ClientEmail(db.Model):
             "trigger_event": self.trigger_event,
             "draft_content": self.draft_content,
             "sent": self.sent,
+            "created_at": self.created_at.isoformat(),
+        }
+
+
+class PriceAlert(db.Model):
+    __tablename__ = "price_alerts"
+
+    id = db.Column(db.Integer, primary_key=True)
+    advisor_id = db.Column(db.Integer, db.ForeignKey("advisors.id"), nullable=False)
+    ticker = db.Column(db.String(20), nullable=False)
+    alert_type = db.Column(db.String(20), nullable=False)  # 'above', 'below', 'pct_day'
+    threshold = db.Column(db.Numeric(10, 4), nullable=False)
+    active = db.Column(db.Boolean, default=True, nullable=False)
+    triggered_at = db.Column(db.DateTime, nullable=True)
+    triggered_price = db.Column(db.Numeric(10, 4), nullable=True)
+    read = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "advisor_id": self.advisor_id,
+            "ticker": self.ticker.upper(),
+            "alert_type": self.alert_type,
+            "threshold": float(self.threshold),
+            "active": self.active,
+            "triggered_at": self.triggered_at.isoformat() if self.triggered_at else None,
+            "triggered_price": float(self.triggered_price) if self.triggered_price else None,
+            "read": self.read,
             "created_at": self.created_at.isoformat(),
         }

@@ -53,6 +53,15 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ days_back }),
   }),
+  getPriceAlerts:   () => req(`/advisors/${id()}/price-alerts`),
+  getUnreadPriceAlerts: () => req(`/advisors/${id()}/price-alerts`).then(a => a.filter(x => !x.read && !x.active).length),
+  createPriceAlert: (ticker, alert_type, threshold) => req(`/advisors/${id()}/price-alerts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ticker, alert_type, threshold }),
+  }),
+  deletePriceAlert: (aid) => req(`/advisors/${id()}/price-alerts/${aid}`, { method: 'DELETE' }),
+  markPriceAlertRead: (aid) => req(`/price-alerts/${aid}/read`, { method: 'PATCH' }),
   getClientEmails:  () => req(`/advisors/${id()}/client-emails`),
   markEmailSent:    (eid) => req(`/client-emails/${eid}/send`, { method: 'PATCH' }),
   generateClientEmail: (ticker, company_name, trigger_event) =>

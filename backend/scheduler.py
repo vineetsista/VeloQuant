@@ -12,9 +12,11 @@ def run_morning_jobs(flask_app):
     Runs at 7:30am ET on weekdays, giving advisors their briefing before market open at 9:30am.
     """
     import os
-    from models import db, Advisor, Holding, Briefing
+    from datetime import datetime, timezone
+    from models import db, Advisor, Holding, Briefing, PriceAlert
     from intelligence.briefing import generate_and_save_briefing
     from intelligence.filing_analyzer import scan_and_analyze_filings
+    from data.polygon import get_snapshot_batch
 
     with flask_app.app_context():
         app_url = os.getenv("APP_URL", "http://localhost:3000")
@@ -64,6 +66,36 @@ def run_morning_jobs(flask_app):
                         logger.info(f"Briefing email delivered to {advisor.email}")
                 except Exception as e:
                     logger.error(f"Email delivery failed for advisor {advisor.id}: {e}")
+
+        # Check price alerts across all advisors
+        try:
+            active = PriceAlert.query.filter_by(active=True).all()
+            if active:
+                tickers = list(set(a.ticker for a in active))
+                prices = get_snapshot_batch(tickers)
+                triggered = 0
+                for alert in active:
+                    p = prices.get(alert.ticker.upper(), {})
+                    close = p.get('close')
+                    pct = p.get('pct_change')
+                    fired = False
+                    if alert.alert_type == 'above' and close and close >= float(alert.threshold):
+                        fired = True
+                    elif alert.alert_type == 'below' and close and close <= float(alert.threshold):
+                        fired = True
+                    elif alert.alert_type == 'pct_day' and pct is not None and abs(pct) >= float(alert.threshold):
+                        fired = True
+                    if fired:
+                        alert.active = False
+                        alert.triggered_at = datetime.now(timezone.utc)
+                        alert.triggered_price = close
+                        alert.read = False
+                        triggered += 1
+                if triggered:
+                    db.session.commit()
+                    logger.info(f"Price alerts: {triggered} triggered")
+        except Exception as e:
+            logger.error(f"Price alert check failed: {e}")
 
         logger.info("Morning job finished")
 

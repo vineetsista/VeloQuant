@@ -7,7 +7,7 @@ from flask_migrate import Migrate
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
-from models import db, Advisor, Holding, Briefing, FilingAlert, ClientEmail
+from models import db, Advisor, Holding, Briefing, FilingAlert, ClientEmail, PriceAlert
 from data.edgar import get_recent_filings, get_cik
 from data.polygon import get_portfolio_market_data, get_overnight_change, get_prices_batch, get_snapshot_batch
 from intelligence.briefing import generate_morning_briefing
@@ -95,6 +95,20 @@ def create_app():
             db.session.execute(db.text(
                 "ALTER TABLE filing_alerts ADD COLUMN IF NOT EXISTS edgar_url VARCHAR(512)"
             ))
+            db.session.execute(db.text("""
+                CREATE TABLE IF NOT EXISTS price_alerts (
+                    id SERIAL PRIMARY KEY,
+                    advisor_id INTEGER NOT NULL REFERENCES advisors(id) ON DELETE CASCADE,
+                    ticker VARCHAR(20) NOT NULL,
+                    alert_type VARCHAR(20) NOT NULL,
+                    threshold NUMERIC(10,4) NOT NULL,
+                    active BOOLEAN NOT NULL DEFAULT TRUE,
+                    triggered_at TIMESTAMP,
+                    triggered_price NUMERIC(10,4),
+                    read BOOLEAN NOT NULL DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """))
             db.session.commit()
         except Exception:
             db.session.rollback()
@@ -607,6 +621,48 @@ def create_app():
             return jsonify({"new_alerts": len(new_alerts), "alerts": new_alerts})
         except Exception as e:
             return jsonify({"error": str(e)}), 500
+
+    # ── Price Alerts (Watchlist) ──────────────────────────────────────────────
+
+    @app.route("/api/advisors/<int:advisor_id>/price-alerts", methods=["GET"])
+    def get_price_alerts(advisor_id):
+        if err := _assert_own(advisor_id): return err
+        alerts = PriceAlert.query.filter_by(advisor_id=advisor_id).order_by(PriceAlert.created_at.desc()).all()
+        return jsonify([a.to_dict() for a in alerts])
+
+    @app.route("/api/advisors/<int:advisor_id>/price-alerts", methods=["POST"])
+    def create_price_alert(advisor_id):
+        if err := _assert_own(advisor_id): return err
+        data = request.get_json()
+        if not all(k in data for k in ("ticker", "alert_type", "threshold")):
+            return jsonify({"error": "ticker, alert_type, and threshold are required"}), 400
+        if data["alert_type"] not in ("above", "below", "pct_day"):
+            return jsonify({"error": "alert_type must be above, below, or pct_day"}), 400
+        alert = PriceAlert(
+            advisor_id=advisor_id,
+            ticker=data["ticker"].upper().strip(),
+            alert_type=data["alert_type"],
+            threshold=data["threshold"],
+        )
+        db.session.add(alert)
+        db.session.commit()
+        return jsonify(alert.to_dict()), 201
+
+    @app.route("/api/advisors/<int:advisor_id>/price-alerts/<int:alert_id>", methods=["DELETE"])
+    def delete_price_alert(advisor_id, alert_id):
+        if err := _assert_own(advisor_id): return err
+        alert = PriceAlert.query.filter_by(id=alert_id, advisor_id=advisor_id).first_or_404()
+        db.session.delete(alert)
+        db.session.commit()
+        return jsonify({"ok": True})
+
+    @app.route("/api/price-alerts/<int:alert_id>/read", methods=["PATCH"])
+    def mark_price_alert_read(alert_id):
+        alert = db.get_or_404(PriceAlert, alert_id)
+        if err := _assert_own(alert.advisor_id): return err
+        alert.read = True
+        db.session.commit()
+        return jsonify(alert.to_dict())
 
     # ── Client Email Generation ───────────────────────────────────────────────
 

@@ -18,6 +18,7 @@ import TermsOfService from './pages/TermsOfService'
 import Disclaimer from './pages/Disclaimer'
 import Contact from './pages/Contact'
 import Unsubscribe from './pages/Unsubscribe'
+import Watchlist from './pages/Watchlist'
 import MarketBar from './components/MarketBar'
 import { getAdvisorId, clearAdvisorId, api } from './api'
 
@@ -26,6 +27,7 @@ const NAV = [
   { to: '/holdings',      end: false, icon: '◈', label: 'Holdings'      },
   { to: '/briefing',      end: false, icon: '≋', label: 'Briefings'     },
   { to: '/filing-alerts', end: false, icon: '◎', label: 'Filing Alerts' },
+  { to: '/watchlist',     end: false, icon: '◉', label: 'Watchlist'     },
   { to: '/client-emails', end: false, icon: '✦', label: 'Client Emails' },
   { to: '/settings',      end: false, icon: '⚙', label: 'Settings'      },
 ]
@@ -34,12 +36,14 @@ function AppLayout() {
   const location = useLocation()
   const [advisor, setAdvisor] = useState(null)
   const [unreadAlerts, setUnreadAlerts] = useState(0)
+  const [unreadPriceAlerts, setUnreadPriceAlerts] = useState(0)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
     if (getAdvisorId()) {
       api.getAdvisor().then(setAdvisor).catch(() => {})
       api.getFilingAlerts(true).then(a => setUnreadAlerts(a.length)).catch(() => {})
+      api.getUnreadPriceAlerts().then(setUnreadPriceAlerts).catch(() => {})
     }
   }, [])
 
@@ -128,14 +132,17 @@ function AppLayout() {
                 {label}
                 {to === '/filing-alerts' && unreadAlerts > 0 && (
                   <span style={{
-                    marginLeft: 'auto',
-                    background: 'var(--warning)',
-                    color: '#fff',
-                    fontSize: 10, fontWeight: 800,
-                    borderRadius: 10,
-                    padding: '1px 6px',
-                    minWidth: 18, textAlign: 'center',
+                    marginLeft: 'auto', background: 'var(--warning)', color: '#fff',
+                    fontSize: 10, fontWeight: 800, borderRadius: 10,
+                    padding: '1px 6px', minWidth: 18, textAlign: 'center',
                   }}>{unreadAlerts}</span>
+                )}
+                {to === '/watchlist' && unreadPriceAlerts > 0 && (
+                  <span style={{
+                    marginLeft: 'auto', background: 'var(--warning)', color: '#fff',
+                    fontSize: 10, fontWeight: 800, borderRadius: 10,
+                    padding: '1px 6px', minWidth: 18, textAlign: 'center',
+                  }}>{unreadPriceAlerts}</span>
                 )}
               </NavLink>
             ))}
@@ -255,6 +262,7 @@ function AppLayout() {
             <Route path="/holdings"      element={<Holdings />} />
             <Route path="/briefing"      element={<Briefing />} />
             <Route path="/filing-alerts" element={<FilingAlerts />} />
+            <Route path="/watchlist"     element={<Watchlist />} />
             <Route path="/client-emails" element={<ClientEmails />} />
             <Route path="/settings"      element={<Settings />} />
             <Route path="/admin"         element={<Admin />} />
