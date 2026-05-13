@@ -93,7 +93,10 @@ function Range52W({ data }) {
   const nearLow = pos <= 20
   const color = nearHigh ? 'var(--success)' : nearLow ? 'var(--danger)' : 'var(--text-2)'
   return (
-    <div style={{ minWidth: 90, marginTop: 5 }}>
+    <div style={{ minWidth: 100, marginTop: 5 }}>
+      <div style={{ fontSize: 9, color, fontWeight: 700, marginBottom: 3 }}>
+        {nearHigh ? '▲ Near 52W High' : nearLow ? '▼ Near 52W Low' : `${pos.toFixed(0)}% of 52W range`}
+      </div>
       <div style={{ position: 'relative', height: 4, background: 'var(--surface-2)', borderRadius: 2, marginBottom: 3 }}>
         <div style={{ width: `${pos}%`, height: '100%', background: `${color}33`, borderRadius: 2 }} />
         <div style={{
@@ -103,11 +106,8 @@ function Range52W({ data }) {
           left: `calc(${pos}% - 3.5px)`,
         }} />
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>
         <span>${Number(low_52w).toFixed(0)}</span>
-        <span style={{ color, fontWeight: 700 }}>
-          {nearHigh ? '▲ Near high' : nearLow ? '▼ Near low' : `${pos.toFixed(0)}% of range`}
-        </span>
         <span>${Number(high_52w).toFixed(0)}</span>
       </div>
     </div>
@@ -369,7 +369,7 @@ export default function Holdings() {
 
   // Upcoming earnings within 30 days
   const upcomingEarnings = Object.entries(earnings)
-    .filter(([, e]) => e.days_out != null && e.days_out <= 30)
+    .filter(([, e]) => e.days_out != null && e.days_out >= 0 && e.days_out <= 30)
     .sort((a, b) => a[1].days_out - b[1].days_out)
     .map(([ticker, e]) => ({ ticker, ...e }))
 
