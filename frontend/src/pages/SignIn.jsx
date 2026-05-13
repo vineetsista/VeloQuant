@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api, setAdvisorId } from '../api'
+import { api, setAdvisorId, setApiKey } from '../api'
 
 export default function SignIn() {
   const [email, setEmail] = useState('')
@@ -18,6 +18,7 @@ export default function SignIn() {
     try {
       const advisor = await api.getAdvisorByEmail(email.trim().toLowerCase(), password)
       setAdvisorId(advisor.id)
+      if (advisor.api_key) setApiKey(advisor.api_key)
       navigate('/')
     } catch (err) {
       setError(err.message)

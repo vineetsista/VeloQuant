@@ -1,7 +1,7 @@
 import os
 import logging
 logging.basicConfig(level=logging.INFO)
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, g
 from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_limiter import Limiter
@@ -48,12 +48,51 @@ def create_app():
     def ratelimit_handler(e):
         return jsonify({"error": "Too many requests. Please wait before trying again."}), 429
 
+    # Routes that don't require an API key
+    _PUBLIC_ENDPOINTS = {
+        'health', 'create_advisor', 'get_advisor_by_email',
+        'verify_email', 'resend_verification', 'forgot_password',
+        'reset_password', 'stripe_webhook', 'demo_generate',
+        'get_market_indices', 'static',
+    }
+
+    @app.before_request
+    def authenticate():
+        if request.endpoint in _PUBLIC_ENDPOINTS:
+            return None
+        if request.endpoint is None:
+            return None  # will 404 normally
+        api_key = request.headers.get('X-API-Key')
+        if not api_key:
+            return jsonify({'error': 'Authentication required'}), 401
+        advisor = Advisor.query.filter_by(api_key=api_key).first()
+        if not advisor:
+            return jsonify({'error': 'Invalid or expired API key'}), 401
+        g.advisor = advisor
+
+    def _assert_own(advisor_id):
+        """Return a 403 response if the authenticated advisor doesn't own this resource."""
+        if g.advisor.id != int(advisor_id) and not g.advisor.is_admin():
+            return jsonify({'error': 'Access denied'}), 403
+        return None
+
     with app.app_context():
         db.create_all()
         # Idempotent schema migrations for columns added after initial deploy
         try:
             db.session.execute(db.text(
                 "ALTER TABLE advisors ADD COLUMN IF NOT EXISTS briefing_email_enabled BOOLEAN NOT NULL DEFAULT TRUE"
+            ))
+            db.session.execute(db.text(
+                "ALTER TABLE advisors ADD COLUMN IF NOT EXISTS api_key VARCHAR(64)"
+            ))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+        # Create unique index on api_key if it doesn't exist
+        try:
+            db.session.execute(db.text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_advisors_api_key ON advisors (api_key)"
             ))
             db.session.commit()
         except Exception:
@@ -85,14 +124,18 @@ def create_app():
         if data.get("password"):
             advisor.set_password(data["password"])
         token = advisor.generate_verification_token()
+        advisor.ensure_api_key()
         db.session.add(advisor)
         db.session.commit()
         app_url = os.getenv("APP_URL", "http://localhost:3000")
         send_verification_email(advisor.email, advisor.name, token, app_url)
-        return jsonify(advisor.to_dict()), 201
+        result = advisor.to_dict()
+        result['api_key'] = advisor.api_key
+        return jsonify(result), 201
 
     @app.route("/api/advisors/<int:advisor_id>")
     def get_advisor(advisor_id):
+        if err := _assert_own(advisor_id): return err
         advisor = db.get_or_404(Advisor, advisor_id)
         return jsonify(advisor.to_dict())
 
@@ -109,7 +152,13 @@ def create_app():
             return jsonify({"error": "No account found with that email address"}), 404
         if advisor.has_password() and not advisor.check_password(password):
             return jsonify({"error": "Incorrect password"}), 401
-        return jsonify(advisor.to_dict())
+        # Generate API key if advisor doesn't have one yet (existing accounts)
+        if not advisor.api_key:
+            advisor.ensure_api_key()
+            db.session.commit()
+        result = advisor.to_dict()
+        result['api_key'] = advisor.api_key
+        return jsonify(result)
 
     # ── Email Verification ────────────────────────────────────────────────────
 
@@ -185,13 +234,13 @@ def create_app():
 
     @app.route("/api/advisors/<int:advisor_id>/holdings", methods=["GET"])
     def get_holdings(advisor_id):
-        db.get_or_404(Advisor, advisor_id)
+        if err := _assert_own(advisor_id): return err
         holdings = Holding.query.filter_by(advisor_id=advisor_id).all()
         return jsonify([h.to_dict() for h in holdings])
 
     @app.route("/api/advisors/<int:advisor_id>/holdings", methods=["POST"])
     def add_holding(advisor_id):
-        db.get_or_404(Advisor, advisor_id)
+        if err := _assert_own(advisor_id): return err
         data = request.get_json()
         if not all(k in data for k in ("ticker", "position_size")):
             return jsonify({"error": "ticker and position_size are required"}), 400
@@ -210,6 +259,7 @@ def create_app():
 
     @app.route("/api/advisors/<int:advisor_id>/holdings/<int:holding_id>", methods=["DELETE"])
     def delete_holding(advisor_id, holding_id):
+        if err := _assert_own(advisor_id): return err
         holding = Holding.query.filter_by(id=holding_id, advisor_id=advisor_id).first_or_404()
         db.session.delete(holding)
         db.session.commit()
@@ -219,7 +269,7 @@ def create_app():
 
     @app.route("/api/advisors/<int:advisor_id>/briefings")
     def get_briefings(advisor_id):
-        db.get_or_404(Advisor, advisor_id)
+        if err := _assert_own(advisor_id): return err
         limit = request.args.get("limit", 10, type=int)
         briefings = (
             Briefing.query.filter_by(advisor_id=advisor_id)
@@ -231,7 +281,7 @@ def create_app():
 
     @app.route("/api/advisors/<int:advisor_id>/briefings/latest")
     def get_latest_briefing(advisor_id):
-        db.get_or_404(Advisor, advisor_id)
+        if err := _assert_own(advisor_id): return err
         briefing = (
             Briefing.query.filter_by(advisor_id=advisor_id)
             .order_by(Briefing.generated_at.desc())
@@ -244,6 +294,7 @@ def create_app():
     @app.route("/api/briefings/<int:briefing_id>", methods=["DELETE"])
     def delete_briefing(briefing_id):
         briefing = db.get_or_404(Briefing, briefing_id)
+        if err := _assert_own(briefing.advisor_id): return err
         db.session.delete(briefing)
         db.session.commit()
         return jsonify({"deleted": briefing_id})
@@ -251,6 +302,7 @@ def create_app():
     @app.route("/api/briefings/<int:briefing_id>/send", methods=["POST"])
     def send_briefing_on_demand(briefing_id):
         briefing = db.get_or_404(Briefing, briefing_id)
+        if err := _assert_own(briefing.advisor_id): return err
         advisor = db.get_or_404(Advisor, briefing.advisor_id)
         success = send_briefing_email(advisor.email, advisor.name, advisor.firm_name, briefing.content)
         if success:
@@ -263,7 +315,7 @@ def create_app():
 
     @app.route("/api/advisors/<int:advisor_id>/filing-alerts")
     def get_filing_alerts(advisor_id):
-        db.get_or_404(Advisor, advisor_id)
+        if err := _assert_own(advisor_id): return err
         unread_only = request.args.get("unread", "false").lower() == "true"
         query = FilingAlert.query.filter_by(advisor_id=advisor_id)
         if unread_only:
@@ -274,6 +326,7 @@ def create_app():
     @app.route("/api/filing-alerts/<int:alert_id>/read", methods=["PATCH"])
     def mark_alert_read(alert_id):
         alert = db.get_or_404(FilingAlert, alert_id)
+        if err := _assert_own(alert.advisor_id): return err
         alert.read = True
         db.session.commit()
         return jsonify(alert.to_dict())
@@ -282,7 +335,7 @@ def create_app():
 
     @app.route("/api/advisors/<int:advisor_id>/client-emails")
     def get_client_emails(advisor_id):
-        db.get_or_404(Advisor, advisor_id)
+        if err := _assert_own(advisor_id): return err
         unsent_only = request.args.get("unsent", "false").lower() == "true"
         query = ClientEmail.query.filter_by(advisor_id=advisor_id)
         if unsent_only:
@@ -293,6 +346,7 @@ def create_app():
     @app.route("/api/client-emails/<int:email_id>/send", methods=["PATCH"])
     def mark_email_sent(email_id):
         email = db.get_or_404(ClientEmail, email_id)
+        if err := _assert_own(email.advisor_id): return err
         email.sent = True
         db.session.commit()
         return jsonify(email.to_dict())
@@ -301,6 +355,7 @@ def create_app():
 
     @app.route("/api/advisors/<int:advisor_id>/scan-filings")
     def scan_filings(advisor_id):
+        if err := _assert_own(advisor_id): return err
         advisor = db.get_or_404(Advisor, advisor_id)
         days_back = request.args.get("days", 7, type=int)
         holdings = Holding.query.filter_by(advisor_id=advisor_id).all()
@@ -324,6 +379,7 @@ def create_app():
 
     @app.route("/api/advisors/<int:advisor_id>/profile", methods=["PATCH"])
     def update_profile(advisor_id):
+        if err := _assert_own(advisor_id): return err
         advisor = db.get_or_404(Advisor, advisor_id)
         data = request.get_json() or {}
         if "name" in data and data["name"].strip():
@@ -335,6 +391,7 @@ def create_app():
 
     @app.route("/api/advisors/<int:advisor_id>/email-preferences", methods=["PATCH"])
     def update_email_preferences(advisor_id):
+        if err := _assert_own(advisor_id): return err
         advisor = db.get_or_404(Advisor, advisor_id)
         data = request.get_json() or {}
         if "briefing_email_enabled" in data:
@@ -344,6 +401,7 @@ def create_app():
 
     @app.route("/api/advisors/<int:advisor_id>/change-password", methods=["POST"])
     def change_password(advisor_id):
+        if err := _assert_own(advisor_id): return err
         advisor = db.get_or_404(Advisor, advisor_id)
         data = request.get_json() or {}
         current = data.get("current_password", "")
@@ -358,6 +416,7 @@ def create_app():
 
     @app.route("/api/advisors/<int:advisor_id>", methods=["DELETE"])
     def delete_advisor(advisor_id):
+        if err := _assert_own(advisor_id): return err
         advisor = db.get_or_404(Advisor, advisor_id)
         db.session.delete(advisor)
         db.session.commit()
@@ -375,7 +434,7 @@ def create_app():
 
     @app.route("/api/advisors/<int:advisor_id>/market-data")
     def get_advisor_market_data(advisor_id):
-        db.get_or_404(Advisor, advisor_id)
+        if err := _assert_own(advisor_id): return err
         holdings = Holding.query.filter_by(advisor_id=advisor_id).all()
         tickers = [h.ticker for h in holdings]
         try:
@@ -399,6 +458,7 @@ def create_app():
 
     @app.route("/api/advisors/<int:advisor_id>/generate-briefing", methods=["POST"])
     def generate_briefing(advisor_id):
+        if err := _assert_own(advisor_id): return err
         advisor = db.get_or_404(Advisor, advisor_id)
         gate = _require_subscription(advisor)
         if gate:
@@ -438,6 +498,7 @@ def create_app():
 
     @app.route("/api/advisors/<int:advisor_id>/analyze-filings", methods=["POST"])
     def analyze_filings(advisor_id):
+        if err := _assert_own(advisor_id): return err
         advisor = db.get_or_404(Advisor, advisor_id)
         gate = _require_subscription(advisor)
         if gate:
@@ -455,6 +516,7 @@ def create_app():
 
     @app.route("/api/advisors/<int:advisor_id>/generate-client-email", methods=["POST"])
     def generate_email(advisor_id):
+        if err := _assert_own(advisor_id): return err
         advisor = db.get_or_404(Advisor, advisor_id)
         gate = _require_subscription(advisor)
         if gate:

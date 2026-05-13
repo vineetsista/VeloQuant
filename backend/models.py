@@ -1,5 +1,6 @@
 import os
 import secrets
+import uuid
 from datetime import datetime, timezone, timedelta
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -24,6 +25,7 @@ class Advisor(db.Model):
     subscription_status = db.Column(db.String(50), nullable=True)  # trialing, active, past_due, canceled, unpaid
     trial_ends_at = db.Column(db.DateTime, nullable=True)
     briefing_email_enabled = db.Column(db.Boolean, nullable=False, default=True, server_default='true')
+    api_key = db.Column(db.String(64), nullable=True, unique=True, index=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def set_password(self, password):
@@ -46,6 +48,11 @@ class Advisor(db.Model):
         self.reset_token = secrets.token_urlsafe(32)
         self.reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=1)
         return self.reset_token
+
+    def ensure_api_key(self):
+        if not self.api_key:
+            self.api_key = uuid.uuid4().hex
+        return self.api_key
 
     def is_legacy(self):
         return self.email_verified is None

@@ -1,8 +1,15 @@
-const STORAGE_KEY = 'ria_advisor_id'
+const STORAGE_KEY    = 'ria_advisor_id'
+const API_KEY_STORAGE = 'ria_api_key'
 
-export function getAdvisorId() { return localStorage.getItem(STORAGE_KEY) }
+export function getAdvisorId()  { return localStorage.getItem(STORAGE_KEY) }
 export function setAdvisorId(id) { localStorage.setItem(STORAGE_KEY, String(id)) }
-export function clearAdvisorId() { localStorage.removeItem(STORAGE_KEY) }
+export function clearAdvisorId() {
+  localStorage.removeItem(STORAGE_KEY)
+  localStorage.removeItem(API_KEY_STORAGE)
+}
+
+export function getApiKey()       { return localStorage.getItem(API_KEY_STORAGE) }
+export function setApiKey(key)    { localStorage.setItem(API_KEY_STORAGE, key) }
 
 function id() {
   const v = getAdvisorId()
@@ -11,7 +18,10 @@ function id() {
 }
 
 async function req(path, options = {}) {
-  const res = await fetch(`/api${path}`, options)
+  const key = getApiKey()
+  const headers = { ...(options.headers || {}) }
+  if (key) headers['X-API-Key'] = key
+  const res = await fetch(`/api${path}`, { ...options, headers })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`)
   return data

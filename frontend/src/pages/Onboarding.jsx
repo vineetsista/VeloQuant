@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api, setAdvisorId, getAdvisorId } from '../api'
+import { api, setAdvisorId, setApiKey, getAdvisorId } from '../api'
 
 const SUGGESTED = ['AAPL', 'JPM', 'JNJ', 'BRK.B', 'VTI', 'MSFT', 'GOOGL', 'AMZN']
 
@@ -49,6 +49,7 @@ export default function Onboarding() {
     try {
       const advisor = await api.createAdvisor(name.trim(), firm.trim(), email.trim(), password)
       setAdvisorId(advisor.id)
+      if (advisor.api_key) setApiKey(advisor.api_key)
       setLocalAdvisorId(advisor.id)
       setStep(2)
     } catch (e) {

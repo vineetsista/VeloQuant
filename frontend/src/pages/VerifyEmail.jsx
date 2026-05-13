@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { api, setAdvisorId } from '../api'
+import { api, setAdvisorId, setApiKey } from '../api'
 
 export default function VerifyEmail() {
   const [searchParams] = useSearchParams()
@@ -19,7 +19,10 @@ export default function VerifyEmail() {
   async function verify() {
     try {
       const data = await api.verifyEmail(token)
-      if (data.advisor) setAdvisorId(data.advisor.id)
+      if (data.advisor) {
+        setAdvisorId(data.advisor.id)
+        if (data.advisor.api_key) setApiKey(data.advisor.api_key)
+      }
       setStatus('success')
     } catch (err) {
       setError(err.message)
