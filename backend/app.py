@@ -310,6 +310,26 @@ def create_app():
         db.session.commit()
         return jsonify({"deleted": holding_id})
 
+    @app.route("/api/validate-ticker/<ticker>")
+    def validate_ticker(ticker):
+        import requests as _req
+        api_key = os.getenv("POLYGON_API_KEY", "")
+        ticker = ticker.upper().strip()
+        if not ticker or not api_key:
+            return jsonify({"valid": False, "name": None})
+        try:
+            r = _req.get(
+                f"https://api.polygon.io/v3/reference/tickers/{ticker}",
+                params={"apiKey": api_key},
+                timeout=5,
+            )
+            if r.status_code == 200:
+                data = r.json().get("results", {})
+                return jsonify({"valid": bool(data), "name": data.get("name")})
+        except Exception:
+            pass
+        return jsonify({"valid": False, "name": None})
+
     # ── Briefings ─────────────────────────────────────────────────────────────
 
     @app.route("/api/advisors/<int:advisor_id>/briefings")

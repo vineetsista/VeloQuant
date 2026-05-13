@@ -389,7 +389,7 @@ def send_briefing_email(
 
         today = datetime.now(timezone.utc).strftime("%A, %B %d").replace(" 0", " ")
         subject = f"Morning Intelligence Briefing — {today}"
-        unsubscribe_url = f"{app_url}/api/unsubscribe/{unsubscribe_token}" if unsubscribe_token and app_url else ""
+        unsubscribe_url = f"{app_url}/unsubscribe/{unsubscribe_token}" if unsubscribe_token and app_url else ""
         html_body = _briefing_to_html(briefing_content, advisor_name, firm_name, unsubscribe_url)
 
         message = Mail(

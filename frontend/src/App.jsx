@@ -17,6 +17,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsOfService from './pages/TermsOfService'
 import Disclaimer from './pages/Disclaimer'
 import Contact from './pages/Contact'
+import Unsubscribe from './pages/Unsubscribe'
 import MarketBar from './components/MarketBar'
 import { getAdvisorId, clearAdvisorId, api } from './api'
 
@@ -32,11 +33,13 @@ const NAV = [
 function AppLayout() {
   const location = useLocation()
   const [advisor, setAdvisor] = useState(null)
+  const [unreadAlerts, setUnreadAlerts] = useState(0)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
     if (getAdvisorId()) {
       api.getAdvisor().then(setAdvisor).catch(() => {})
+      api.getFilingAlerts(true).then(a => setUnreadAlerts(a.length)).catch(() => {})
     }
   }, [])
 
@@ -80,6 +83,9 @@ function AppLayout() {
   if (location.pathname === '/contact') {
     return <Routes><Route path="/contact" element={<Contact />} /></Routes>
   }
+  if (location.pathname.startsWith('/unsubscribe')) {
+    return <Routes><Route path="/unsubscribe/*" element={<Unsubscribe />} /></Routes>
+  }
 
   // Landing page for logged-out visitors
   if (!getAdvisorId()) {
@@ -120,6 +126,17 @@ function AppLayout() {
               >
                 <span className="nav-icon">{icon}</span>
                 {label}
+                {to === '/filing-alerts' && unreadAlerts > 0 && (
+                  <span style={{
+                    marginLeft: 'auto',
+                    background: 'var(--warning)',
+                    color: '#fff',
+                    fontSize: 10, fontWeight: 800,
+                    borderRadius: 10,
+                    padding: '1px 6px',
+                    minWidth: 18, textAlign: 'center',
+                  }}>{unreadAlerts}</span>
+                )}
               </NavLink>
             ))}
           </nav>

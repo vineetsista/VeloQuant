@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://riaplatform-production.up.railway.app/sitemap.xml

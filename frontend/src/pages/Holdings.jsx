@@ -28,16 +28,18 @@ function PriceChange({ pct }) {
 }
 
 export default function Holdings() {
-  const [holdings,   setHoldings]   = useState([])
-  const [marketData, setMarketData] = useState({})
-  const [ticker,     setTicker]     = useState('')
-  const [size,       setSize]       = useState('')
-  const [loading,    setLoading]    = useState(true)
-  const [adding,     setAdding]     = useState(false)
-  const [importing,  setImporting]  = useState(false)
-  const [importMsg,  setImportMsg]  = useState(null)
-  const [error,      setError]      = useState(null)
-  const [sortBy,     setSortBy]     = useState('size')
+  const [holdings,       setHoldings]       = useState([])
+  const [marketData,     setMarketData]     = useState({})
+  const [ticker,         setTicker]         = useState('')
+  const [size,           setSize]           = useState('')
+  const [loading,        setLoading]        = useState(true)
+  const [adding,         setAdding]         = useState(false)
+  const [importing,      setImporting]      = useState(false)
+  const [importMsg,      setImportMsg]      = useState(null)
+  const [error,          setError]          = useState(null)
+  const [sortBy,         setSortBy]         = useState('size')
+  const [tickerValid,    setTickerValid]    = useState(null)  // null | {valid, name}
+  const [validating,     setValidating]     = useState(false)
 
   useEffect(() => { load() }, [])
 
@@ -53,9 +55,25 @@ export default function Holdings() {
     finally { setLoading(false) }
   }
 
+  async function validateTicker(t) {
+    const clean = t.toUpperCase().trim()
+    if (!clean || clean.length < 1) { setTickerValid(null); return }
+    setValidating(true)
+    try {
+      const key = localStorage.getItem('ria_api_key')
+      const res = await fetch(`/api/validate-ticker/${clean}`, {
+        headers: key ? { 'X-API-Key': key } : {},
+      })
+      const d = await res.json()
+      setTickerValid(d)
+    } catch (_) { setTickerValid(null) }
+    finally { setValidating(false) }
+  }
+
   async function handleAdd(e) {
     e.preventDefault()
     if (!ticker || !size) return
+    if (tickerValid && tickerValid.valid === false) return
     setAdding(true); setError(null)
     try {
       const h = await api.addHolding(ticker.toUpperCase().trim(), parseFloat(size))
@@ -63,8 +81,7 @@ export default function Holdings() {
         const ex = prev.find(x => x.ticker === h.ticker)
         return ex ? prev.map(x => x.ticker === h.ticker ? h : x) : [...prev, h]
       })
-      setTicker(''); setSize('')
-      // Refresh market data after adding
+      setTicker(''); setSize(''); setTickerValid(null)
       try { setMarketData(await api.getMarketData()) } catch (_) {}
     } catch (e) { setError(e.message) }
     finally { setAdding(false) }
@@ -243,14 +260,27 @@ export default function Holdings() {
           <form onSubmit={handleAdd} className="form-row" style={{ flexWrap: 'wrap' }}>
             <div className="form-group">
               <label className="form-label">Ticker</label>
-              <input
-                className="form-input"
-                placeholder="AAPL"
-                value={ticker}
-                onChange={e => setTicker(e.target.value.toUpperCase())}
-                style={{ width: 100 }}
-                required
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  className="form-input"
+                  placeholder="AAPL"
+                  value={ticker}
+                  onChange={e => { setTicker(e.target.value.toUpperCase()); setTickerValid(null) }}
+                  onBlur={e => validateTicker(e.target.value)}
+                  style={{
+                    width: 100,
+                    borderColor: tickerValid?.valid === false ? 'var(--danger)' : tickerValid?.valid ? 'var(--success)' : undefined,
+                  }}
+                  required
+                />
+                {(validating || tickerValid) && (
+                  <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, fontSize: 11, whiteSpace: 'nowrap' }}>
+                    {validating && <span style={{ color: 'var(--text-2)' }}>Checking...</span>}
+                    {!validating && tickerValid?.valid && <span style={{ color: 'var(--success)' }}>✓ {tickerValid.name?.split(' ').slice(0, 3).join(' ')}</span>}
+                    {!validating && tickerValid?.valid === false && <span style={{ color: 'var(--danger)' }}>✕ Ticker not found</span>}
+                  </div>
+                )}
+              </div>
             </div>
             <div className="form-group">
               <label className="form-label">Position Size ($)</label>
