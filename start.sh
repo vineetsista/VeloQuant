@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+source /app/.venv/bin/activate
+
 cd backend
 
 echo "==> Starting server..."
