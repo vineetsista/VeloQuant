@@ -7,9 +7,9 @@ from flask_migrate import Migrate
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
-from models import db, Advisor, Holding, Briefing, FilingAlert, ClientEmail, PriceAlert
+from models import db, Advisor, Holding, Briefing, FilingAlert, ClientEmail, PriceAlert, PortfolioSnapshot, ClientContact
 from data.edgar import get_recent_filings, get_cik
-from data.polygon import get_portfolio_market_data, get_overnight_change, get_prices_batch, get_snapshot_batch
+from data.polygon import get_portfolio_market_data, get_overnight_change, get_prices_batch, get_snapshot_batch, get_upcoming_earnings, get_upcoming_dividends
 from intelligence.briefing import generate_morning_briefing
 from intelligence.filing_analyzer import scan_and_analyze_filings
 from intelligence.email_generator import generate_client_email
@@ -17,6 +17,7 @@ from scheduler import start_scheduler, run_morning_jobs
 from email_delivery import (
     send_verification_email, send_password_reset_email,
     send_welcome_email, send_trial_reminder_email, send_payment_failed_email,
+    send_email_change_email, send_job_failure_email,
 )
 
 load_dotenv()
@@ -52,8 +53,8 @@ def create_app():
     _PUBLIC_ENDPOINTS = {
         'health', 'create_advisor', 'get_advisor_by_email',
         'verify_email', 'resend_verification', 'forgot_password',
-        'reset_password', 'unsubscribe', 'stripe_webhook', 'demo_generate',
-        'get_market_indices', 'contact', 'static', 'serve_react',
+        'reset_password', 'verify_email_change', 'unsubscribe', 'stripe_webhook',
+        'demo_generate', 'get_market_indices', 'contact', 'static', 'serve_react',
     }
 
     @app.before_request
@@ -84,14 +85,48 @@ def create_app():
                 "ALTER TABLE advisors ADD COLUMN IF NOT EXISTS briefing_email_enabled BOOLEAN NOT NULL DEFAULT TRUE"
             ))
             db.session.execute(db.text(
+                "ALTER TABLE advisors ADD COLUMN IF NOT EXISTS filing_alert_email_enabled BOOLEAN NOT NULL DEFAULT TRUE"
+            ))
+            db.session.execute(db.text(
+                "ALTER TABLE advisors ADD COLUMN IF NOT EXISTS price_alert_email_enabled BOOLEAN NOT NULL DEFAULT TRUE"
+            ))
+            db.session.execute(db.text(
                 "ALTER TABLE advisors ADD COLUMN IF NOT EXISTS api_key VARCHAR(64)"
             ))
             db.session.execute(db.text(
                 "ALTER TABLE advisors ADD COLUMN IF NOT EXISTS unsubscribe_token VARCHAR(64)"
             ))
             db.session.execute(db.text(
+                "ALTER TABLE advisors ADD COLUMN IF NOT EXISTS pending_email VARCHAR(200)"
+            ))
+            db.session.execute(db.text(
+                "ALTER TABLE advisors ADD COLUMN IF NOT EXISTS email_change_token VARCHAR(100)"
+            ))
+            db.session.execute(db.text(
                 "ALTER TABLE holdings ADD COLUMN IF NOT EXISTS shares NUMERIC(15,6)"
             ))
+            db.session.execute(db.text(
+                "ALTER TABLE holdings ADD COLUMN IF NOT EXISTS notes TEXT"
+            ))
+            db.session.execute(db.text(
+                "ALTER TABLE holdings ADD COLUMN IF NOT EXISTS client_tag VARCHAR(100)"
+            ))
+            db.session.execute(db.text(
+                "ALTER TABLE advisors ADD COLUMN IF NOT EXISTS slack_webhook_url VARCHAR(512)"
+            ))
+            db.session.execute(db.text(
+                "ALTER TABLE advisors ADD COLUMN IF NOT EXISTS briefing_focus VARCHAR(500)"
+            ))
+            db.session.execute(db.text("""
+                CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+                    id SERIAL PRIMARY KEY,
+                    advisor_id INTEGER NOT NULL REFERENCES advisors(id) ON DELETE CASCADE,
+                    date DATE NOT NULL,
+                    total_value NUMERIC(15,2) NOT NULL,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    CONSTRAINT uq_snapshot_advisor_date UNIQUE (advisor_id, date)
+                )
+            """))
             db.session.execute(db.text(
                 "ALTER TABLE filing_alerts ADD COLUMN IF NOT EXISTS edgar_url VARCHAR(512)"
             ))
@@ -106,6 +141,16 @@ def create_app():
                     triggered_at TIMESTAMP,
                     triggered_price NUMERIC(10,4),
                     read BOOLEAN NOT NULL DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """))
+            db.session.execute(db.text("""
+                CREATE TABLE IF NOT EXISTS client_contacts (
+                    id SERIAL PRIMARY KEY,
+                    advisor_id INTEGER NOT NULL REFERENCES advisors(id) ON DELETE CASCADE,
+                    name VARCHAR(200) NOT NULL,
+                    email VARCHAR(200) NOT NULL,
+                    client_tag VARCHAR(100),
                     created_at TIMESTAMP DEFAULT NOW()
                 )
             """))
@@ -340,12 +385,24 @@ def create_app():
             db.session.commit()
             return jsonify(existing.to_dict())
 
-        holding = Holding(advisor_id=advisor_id, ticker=ticker, position_size=data["position_size"])
+        holding = Holding(
+            advisor_id=advisor_id, ticker=ticker, position_size=data["position_size"],
+            client_tag=(data.get("client_tag") or "").strip() or None,
+        )
         db.session.add(holding)
         db.session.flush()
         _set_shares(holding)
         db.session.commit()
         return jsonify(holding.to_dict()), 201
+
+    @app.route("/api/advisors/<int:advisor_id>/holdings/<int:holding_id>/client", methods=["PATCH"])
+    def update_holding_client(advisor_id, holding_id):
+        if err := _assert_own(advisor_id): return err
+        holding = Holding.query.filter_by(id=holding_id, advisor_id=advisor_id).first_or_404()
+        data = request.get_json(silent=True) or {}
+        holding.client_tag = (data.get("client_tag") or "").strip() or None
+        db.session.commit()
+        return jsonify(holding.to_dict())
 
     @app.route("/api/advisors/<int:advisor_id>/holdings/<int:holding_id>", methods=["DELETE"])
     def delete_holding(advisor_id, holding_id):
@@ -461,6 +518,70 @@ def create_app():
         db.session.commit()
         return jsonify(email.to_dict())
 
+    @app.route("/api/client-emails/<int:email_id>", methods=["DELETE"])
+    def delete_client_email(email_id):
+        email = db.get_or_404(ClientEmail, email_id)
+        if err := _assert_own(email.advisor_id): return err
+        db.session.delete(email)
+        db.session.commit()
+        return jsonify({"deleted": True})
+
+    @app.route("/api/filing-alerts/<int:alert_id>", methods=["DELETE"])
+    def delete_filing_alert(alert_id):
+        alert = db.get_or_404(FilingAlert, alert_id)
+        if err := _assert_own(alert.advisor_id): return err
+        db.session.delete(alert)
+        db.session.commit()
+        return jsonify({"deleted": True})
+
+    # ── Client Contacts ───────────────────────────────────────────────────────
+
+    @app.route("/api/advisors/<int:advisor_id>/contacts")
+    def get_contacts(advisor_id):
+        if err := _assert_own(advisor_id): return err
+        contacts = ClientContact.query.filter_by(advisor_id=advisor_id).order_by(ClientContact.name).all()
+        return jsonify([c.to_dict() for c in contacts])
+
+    @app.route("/api/advisors/<int:advisor_id>/contacts", methods=["POST"])
+    def create_contact(advisor_id):
+        if err := _assert_own(advisor_id): return err
+        data = request.get_json() or {}
+        name = data.get("name", "").strip()
+        email_addr = data.get("email", "").strip().lower()
+        if not name or not email_addr:
+            return jsonify({"error": "name and email are required"}), 400
+        contact = ClientContact(
+            advisor_id=advisor_id,
+            name=name,
+            email=email_addr,
+            client_tag=data.get("client_tag", "").strip() or None,
+        )
+        db.session.add(contact)
+        db.session.commit()
+        return jsonify(contact.to_dict()), 201
+
+    @app.route("/api/advisors/<int:advisor_id>/contacts/<int:contact_id>", methods=["PATCH"])
+    def update_contact(advisor_id, contact_id):
+        if err := _assert_own(advisor_id): return err
+        contact = ClientContact.query.filter_by(id=contact_id, advisor_id=advisor_id).first_or_404()
+        data = request.get_json() or {}
+        if "name" in data:
+            contact.name = data["name"].strip()
+        if "email" in data:
+            contact.email = data["email"].strip().lower()
+        if "client_tag" in data:
+            contact.client_tag = data["client_tag"].strip() or None
+        db.session.commit()
+        return jsonify(contact.to_dict())
+
+    @app.route("/api/advisors/<int:advisor_id>/contacts/<int:contact_id>", methods=["DELETE"])
+    def delete_contact(advisor_id, contact_id):
+        if err := _assert_own(advisor_id): return err
+        contact = ClientContact.query.filter_by(id=contact_id, advisor_id=advisor_id).first_or_404()
+        db.session.delete(contact)
+        db.session.commit()
+        return jsonify({"deleted": True})
+
     # ── EDGAR (test) ──────────────────────────────────────────────────────────
 
     @app.route("/api/advisors/<int:advisor_id>/scan-filings")
@@ -506,8 +627,63 @@ def create_app():
         data = request.get_json() or {}
         if "briefing_email_enabled" in data:
             advisor.briefing_email_enabled = bool(data["briefing_email_enabled"])
+        if "filing_alert_email_enabled" in data:
+            advisor.filing_alert_email_enabled = bool(data["filing_alert_email_enabled"])
+        if "price_alert_email_enabled" in data:
+            advisor.price_alert_email_enabled = bool(data["price_alert_email_enabled"])
+        if "briefing_focus" in data:
+            focus = (data["briefing_focus"] or "").strip()
+            advisor.briefing_focus = focus[:500] if focus else None
         db.session.commit()
         return jsonify(advisor.to_dict())
+
+    @app.route("/api/advisors/<int:advisor_id>/portfolio-snapshots")
+    def get_portfolio_snapshots(advisor_id):
+        if err := _assert_own(advisor_id): return err
+        days = min(int(request.args.get("days", 30)), 365)
+        from datetime import date, timedelta
+        cutoff = date.today() - timedelta(days=days)
+        snaps = PortfolioSnapshot.query.filter(
+            PortfolioSnapshot.advisor_id == advisor_id,
+            PortfolioSnapshot.date >= cutoff,
+        ).order_by(PortfolioSnapshot.date.asc()).all()
+        return jsonify([s.to_dict() for s in snaps])
+
+    @app.route("/api/advisors/<int:advisor_id>/holdings/52w")
+    def get_52w_ranges(advisor_id):
+        if err := _assert_own(advisor_id): return err
+        from data.polygon import get_52w_ranges as _get_52w
+        holdings = Holding.query.filter_by(advisor_id=advisor_id).all()
+        tickers = list(set(h.ticker.upper() for h in holdings))
+        try:
+            data = _get_52w(tickers)
+            return jsonify(data)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/advisors/<int:advisor_id>/slack", methods=["PATCH"])
+    def update_slack_webhook(advisor_id):
+        if err := _assert_own(advisor_id): return err
+        advisor = db.get_or_404(Advisor, advisor_id)
+        data = request.get_json() or {}
+        url = (data.get("webhook_url") or "").strip()
+        if url and not url.startswith("https://hooks.slack.com/"):
+            return jsonify({"error": "Invalid Slack webhook URL"}), 400
+        advisor.slack_webhook_url = url or None
+        db.session.commit()
+        return jsonify(advisor.to_dict())
+
+    @app.route("/api/advisors/<int:advisor_id>/slack/test", methods=["POST"])
+    def test_slack_webhook(advisor_id):
+        if err := _assert_own(advisor_id): return err
+        advisor = db.get_or_404(Advisor, advisor_id)
+        if not advisor.slack_webhook_url:
+            return jsonify({"error": "No Slack webhook configured"}), 400
+        from email_delivery import send_slack
+        ok = send_slack(advisor.slack_webhook_url, f"✅ VeloQuant test notification — Slack is connected for {advisor.name} ({advisor.firm_name})")
+        if not ok:
+            return jsonify({"error": "Slack delivery failed — check your webhook URL"}), 502
+        return jsonify({"message": "Test notification sent"})
 
     @app.route("/api/advisors/<int:advisor_id>/change-password", methods=["POST"])
     def change_password(advisor_id):
@@ -523,6 +699,50 @@ def create_app():
         advisor.set_password(new_pw)
         db.session.commit()
         return jsonify({"message": "Password updated"})
+
+    @app.route("/api/advisors/<int:advisor_id>/rotate-api-key", methods=["POST"])
+    def rotate_api_key(advisor_id):
+        if err := _assert_own(advisor_id): return err
+        advisor = db.get_or_404(Advisor, advisor_id)
+        new_key = advisor.rotate_api_key()
+        db.session.commit()
+        return jsonify({"api_key": new_key})
+
+    @app.route("/api/advisors/<int:advisor_id>/request-email-change", methods=["POST"])
+    @limiter.limit("5 per hour")
+    def request_email_change(advisor_id):
+        if err := _assert_own(advisor_id): return err
+        advisor = db.get_or_404(Advisor, advisor_id)
+        data = request.get_json() or {}
+        new_email = data.get("email", "").strip().lower()
+        if not new_email or "@" not in new_email:
+            return jsonify({"error": "Valid email address required"}), 400
+        if new_email == advisor.email.lower():
+            return jsonify({"error": "That is already your email address"}), 400
+        if Advisor.query.filter_by(email=new_email).first():
+            return jsonify({"error": "That email address is already registered"}), 409
+        token = advisor.request_email_change(new_email)
+        db.session.commit()
+        app_url = os.getenv("APP_URL", "http://localhost:3000")
+        send_email_change_email(new_email, advisor.name, token, app_url)
+        return jsonify({"message": "Verification email sent to new address"})
+
+    @app.route("/api/verify-email-change/<token>", methods=["POST"])
+    def verify_email_change(token):
+        advisor = Advisor.query.filter_by(email_change_token=token).first()
+        if not advisor or not advisor.pending_email:
+            return jsonify({"error": "Invalid or expired link"}), 400
+        new_email = advisor.pending_email
+        if Advisor.query.filter(Advisor.email == new_email, Advisor.id != advisor.id).first():
+            advisor.pending_email = None
+            advisor.email_change_token = None
+            db.session.commit()
+            return jsonify({"error": "That email address is already in use"}), 409
+        advisor.email = new_email
+        advisor.pending_email = None
+        advisor.email_change_token = None
+        db.session.commit()
+        return jsonify({"message": "Email address updated successfully"})
 
     @app.route("/api/advisors/<int:advisor_id>", methods=["DELETE"])
     def delete_advisor(advisor_id):
@@ -549,6 +769,53 @@ def create_app():
         tickers = [h.ticker for h in holdings]
         try:
             data = get_portfolio_market_data(tickers)
+            return jsonify(data)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/advisors/<int:advisor_id>/earnings")
+    def get_advisor_earnings(advisor_id):
+        if err := _assert_own(advisor_id): return err
+        holdings = Holding.query.filter_by(advisor_id=advisor_id).all()
+        tickers = [h.ticker for h in holdings]
+        if not tickers:
+            return jsonify({})
+        try:
+            data = get_upcoming_earnings(tickers)
+            return jsonify(data)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/advisors/<int:advisor_id>/dividends")
+    def get_advisor_dividends(advisor_id):
+        if err := _assert_own(advisor_id): return err
+        holdings = Holding.query.filter_by(advisor_id=advisor_id).all()
+        tickers = [h.ticker for h in holdings]
+        if not tickers:
+            return jsonify({})
+        try:
+            data = get_upcoming_dividends(tickers)
+            return jsonify(data)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/advisors/<int:advisor_id>/holdings/<int:holding_id>/notes", methods=["PATCH"])
+    def update_holding_notes(advisor_id, holding_id):
+        if err := _assert_own(advisor_id): return err
+        holding = Holding.query.filter_by(id=holding_id, advisor_id=advisor_id).first_or_404()
+        data = request.get_json(silent=True) or {}
+        holding.notes = (data.get("notes") or "").strip() or None
+        db.session.commit()
+        return jsonify(holding.to_dict())
+
+    @app.route("/api/market/prices")
+    def get_market_prices():
+        tickers_str = request.args.get("tickers", "")
+        tickers = [t.strip().upper() for t in tickers_str.split(",") if t.strip()][:20]
+        if not tickers:
+            return jsonify({})
+        try:
+            data = get_snapshot_batch(tickers)
             return jsonify(data)
         except Exception as e:
             return jsonify({"error": str(e)}), 500
@@ -581,13 +848,20 @@ def create_app():
         days_back_filings = days_back.get("days_back_filings", 1)
 
         holdings_data = [
-            {"ticker": h.ticker, "position_size": float(h.position_size)}
+            {
+                "ticker": h.ticker,
+                "position_size": float(h.position_size),
+                "shares": float(h.shares) if h.shares is not None else None,
+                "notes": h.notes,
+                "client_tag": h.client_tag,
+            }
             for h in holdings
         ]
 
         try:
             content = generate_morning_briefing(
-                advisor.name, advisor.firm_name, holdings_data, days_back_filings
+                advisor.name, advisor.firm_name, holdings_data, days_back_filings,
+                briefing_focus=advisor.briefing_focus,
             )
         except Exception as e:
             return jsonify({"error": str(e)}), 500
@@ -660,6 +934,26 @@ def create_app():
     def mark_price_alert_read(alert_id):
         alert = db.get_or_404(PriceAlert, alert_id)
         if err := _assert_own(alert.advisor_id): return err
+        alert.read = True
+        db.session.commit()
+        return jsonify(alert.to_dict())
+
+    @app.route("/api/advisors/<int:advisor_id>/price-alerts/mark-all-read", methods=["POST"])
+    def mark_all_price_alerts_read(advisor_id):
+        if err := _assert_own(advisor_id): return err
+        PriceAlert.query.filter_by(advisor_id=advisor_id, active=False, read=False).update({"read": True})
+        db.session.commit()
+        return jsonify({"ok": True})
+
+    @app.route("/api/price-alerts/<int:alert_id>/reactivate", methods=["POST"])
+    def reactivate_price_alert(alert_id):
+        alert = db.get_or_404(PriceAlert, alert_id)
+        if err := _assert_own(alert.advisor_id): return err
+        if alert.active:
+            return jsonify({"error": "Alert is already active"}), 400
+        alert.active = True
+        alert.triggered_at = None
+        alert.triggered_price = None
         alert.read = True
         db.session.commit()
         return jsonify(alert.to_dict())
@@ -768,10 +1062,12 @@ def create_app():
             advisor.stripe_customer_id = customer.id
             db.session.commit()
 
+        annual = bool(data.get("annual"))
+        price_id = os.getenv("STRIPE_ANNUAL_PRICE_ID") if annual else os.getenv("STRIPE_PRICE_ID")
         session = stripe.checkout.Session.create(
             customer=advisor.stripe_customer_id,
             payment_method_types=["card"],
-            line_items=[{"price": os.getenv("STRIPE_PRICE_ID"), "quantity": 1}],
+            line_items=[{"price": price_id, "quantity": 1}],
             mode="subscription",
             subscription_data={"trial_period_days": 14},
             success_url=f"{app_url}/?checkout=success",
@@ -997,7 +1293,7 @@ def create_app():
         index = os.path.join(static_dir, 'index.html')
         if os.path.isfile(index):
             return send_from_directory(static_dir, 'index.html')
-        return jsonify({"message": "RIA Intelligence API"}), 200
+        return jsonify({"message": "VeloQuant API"}), 200
 
     # Start scheduler once (guard against Flask reloader double-start)
     if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":

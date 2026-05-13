@@ -138,7 +138,7 @@ export default function Onboarding() {
             background: 'linear-gradient(120deg, var(--text) 0%, var(--accent-b) 100%)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
-          }}>RIA Intelligence</div>
+          }}>VeloQuant</div>
         </div>
 
         {/* Step indicator */}

@@ -24,7 +24,7 @@ export default function Unsubscribe() {
     <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 20px' }}>
       <div style={{ width: '100%', maxWidth: 440, textAlign: 'center' }}>
         <div style={{ width: 52, height: 52, background: 'linear-gradient(135deg, var(--accent), var(--accent-b))', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: '#fff', fontWeight: 900, margin: '0 auto 20px', boxShadow: '0 0 40px rgba(79,124,246,0.3)' }}>◆</div>
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 16 }}>RIA Intelligence</div>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 16 }}>VeloQuant</div>
 
         {status === 'loading' && (
           <>

@@ -13,6 +13,7 @@ export default function FilingAlerts() {
   const [filter, setFilter] = useState('all')
   const [expanded, setExpanded] = useState(null)
   const [markingAll, setMarkingAll] = useState(false)
+  const [deleting, setDeleting] = useState(null)
   const navigate = useNavigate()
 
   useEffect(() => { load() }, [])
@@ -43,6 +44,16 @@ export default function FilingAlerts() {
       const updated = await api.markAlertRead(id)
       setAlerts(prev => prev.map(a => a.id === id ? updated : a))
     } catch (e) { setError(e.message) }
+  }
+
+  async function handleDeleteAlert(id) {
+    setDeleting(id)
+    try {
+      await api.deleteFilingAlert(id)
+      setAlerts(prev => prev.filter(a => a.id !== id))
+      if (expanded === id) setExpanded(null)
+    } catch (e) { setError(e.message) }
+    finally { setDeleting(null) }
   }
 
   async function handleMarkAllRead() {
@@ -138,8 +149,10 @@ export default function FilingAlerts() {
       {filtered.length === 0 ? (
         <div className="card">
           <div className="empty">
-            <strong>{filter === 'unread' ? 'All caught up!' : 'No filing alerts'}</strong>
-            {filter === 'unread' ? 'No unread alerts.' : 'Run a scan to analyze recent SEC filings for your holdings.'}
+            <strong>{filter === 'unread' ? 'All caught up!' : 'No filing alerts yet'}</strong>
+            {filter === 'unread'
+              ? 'No unread alerts.'
+              : 'Filings are scanned automatically each morning at 7:30am ET. Use "Scan Filings" above to check right now.'}
           </div>
         </div>
       ) : (
@@ -207,7 +220,7 @@ export default function FilingAlerts() {
                         </div>
                       )}
                       {expanded === a.id && (
-                        <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }} onClick={ev => ev.stopPropagation()}>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap', alignItems: 'center' }} onClick={ev => ev.stopPropagation()}>
                           {a.edgar_url && (
                             <a
                               href={a.edgar_url}
@@ -223,6 +236,13 @@ export default function FilingAlerts() {
                             onClick={() => navigate(`/client-emails?ticker=${a.ticker}&event=${encodeURIComponent(`${a.ticker} filed a ${a.filing_type} on ${new Date(a.filing_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}. Key insight: ${a.key_insight.slice(0, 200)}`)}`)}
                           >
                             ✦ Draft Client Email
+                          </button>
+                          <button
+                            onClick={() => handleDeleteAlert(a.id)}
+                            disabled={deleting === a.id}
+                            style={{ marginLeft: 'auto', fontSize: 12, padding: '5px 12px', borderRadius: 8, border: '1px solid rgba(239,68,68,0.3)', background: 'transparent', color: 'var(--danger)', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, opacity: deleting === a.id ? 0.5 : 1 }}
+                          >
+                            {deleting === a.id ? 'Deleting...' : '✕ Delete'}
                           </button>
                         </div>
                       )}

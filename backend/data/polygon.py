@@ -285,3 +285,199 @@ def get_portfolio_market_data(tickers: list[str]) -> dict:
             pass
         portfolio[tu] = {"price": price, "news": news}
     return portfolio
+
+
+# ── Earnings Calendar ─────────────────────────────────────────────────────────
+
+_earnings_cache: dict = {}
+_EARNINGS_TTL = 86400  # 24 hours — quarterly windows shift slowly
+
+
+def get_upcoming_earnings(tickers: list[str]) -> dict:
+    """Estimate next earnings date per ticker from most recent quarterly report.
+
+    Calls /vX/reference/financials per ticker (Polygon free tier).
+    Estimates next report as last quarter-end + 91 days.
+    Results cached 24 hours. Returns {TICKER: {last_period, next_est, days_out}}.
+    """
+    from datetime import datetime, timedelta
+    today = datetime.now()
+    now_ts = _time.time()
+    result = {}
+    to_fetch = []
+
+    for ticker in tickers:
+        tu = ticker.upper()
+        cached = _earnings_cache.get(tu)
+        if cached and now_ts - cached["ts"] < _EARNINGS_TTL:
+            if cached["data"]:
+                result[tu] = cached["data"]
+        else:
+            to_fetch.append(tu)
+
+    for i, tu in enumerate(to_fetch):
+        if i > 0:
+            _time.sleep(12)  # respect free-tier 5 calls/minute
+        try:
+            resp = requests.get(
+                f"{POLYGON_BASE}/vX/reference/financials",
+                params={"ticker": tu, "timeframe": "quarterly", "limit": 1, "apiKey": _key()},
+                timeout=10,
+            )
+            entry = None
+            if resp.status_code == 200:
+                items = resp.json().get("results", [])
+                if items:
+                    last_period = (items[0].get("end_date") or items[0].get("filing_date") or "")[:10]
+                    if len(last_period) == 10:
+                        last_dt = datetime.strptime(last_period, "%Y-%m-%d")
+                        next_dt = last_dt + timedelta(days=91)
+                        entry = {
+                            "last_period": last_period,
+                            "next_est": next_dt.strftime("%Y-%m-%d"),
+                            "days_out": (next_dt - today).days,
+                        }
+                        result[tu] = entry
+            elif resp.status_code == 429:
+                print(f"[polygon] earnings rate-limited — stopping at {tu}", flush=True)
+                break
+            _earnings_cache[tu] = {"data": entry, "ts": now_ts}
+        except Exception as e:
+            print(f"[polygon] earnings/{tu}: {type(e).__name__}", flush=True)
+            _earnings_cache[tu] = {"data": None, "ts": now_ts}
+
+    return result
+
+
+# ── Dividend Calendar ─────────────────────────────────────────────────────────
+
+_dividends_cache: dict = {}
+_DIVIDENDS_TTL = 86400  # 24 hours
+
+
+_52w_cache: dict = {}
+_52W_TTL = 86400  # 24 hours
+
+
+def get_52w_ranges(tickers: list[str]) -> dict:
+    """Return 52-week high/low per ticker using weekly aggregate bars.
+
+    One API call per ticker, cached 24 hours. Rate-limited to Polygon free tier.
+    Returns {TICKER: {high_52w, low_52w, current, pct_from_high, pct_from_low}}.
+    """
+    now_ts = _time.time()
+    today = datetime.now()
+    from_date = (today - timedelta(days=365)).strftime("%Y-%m-%d")
+    to_date = today.strftime("%Y-%m-%d")
+    result = {}
+    to_fetch = []
+
+    for ticker in tickers:
+        tu = ticker.upper()
+        cached = _52w_cache.get(tu)
+        if cached and now_ts - cached["ts"] < _52W_TTL:
+            if cached["data"]:
+                result[tu] = cached["data"]
+        else:
+            to_fetch.append(tu)
+
+    for i, tu in enumerate(to_fetch):
+        if i > 0:
+            _time.sleep(12)
+        try:
+            resp = requests.get(
+                f"{POLYGON_BASE}/v2/aggs/ticker/{tu}/range/1/week/{from_date}/{to_date}",
+                params={"adjusted": "true", "sort": "asc", "limit": 52, "apiKey": _key()},
+                timeout=10,
+            )
+            entry = None
+            if resp.status_code == 200:
+                bars = resp.json().get("results", [])
+                if bars:
+                    high_52w = max(b.get("h", 0) for b in bars)
+                    low_52w = min(b.get("l", float("inf")) for b in bars)
+                    current = bars[-1].get("c")
+                    if current and high_52w and low_52w and low_52w < float("inf"):
+                        entry = {
+                            "high_52w": round(high_52w, 2),
+                            "low_52w": round(low_52w, 2),
+                            "current": round(current, 2),
+                            "pct_from_high": round((current - high_52w) / high_52w * 100, 1),
+                            "pct_from_low": round((current - low_52w) / low_52w * 100, 1),
+                        }
+                        result[tu] = entry
+            elif resp.status_code == 429:
+                print(f"[polygon] 52w rate-limited — stopping at {tu}", flush=True)
+                break
+            _52w_cache[tu] = {"data": entry, "ts": now_ts}
+        except Exception as e:
+            print(f"[polygon] 52w/{tu}: {type(e).__name__}", flush=True)
+            _52w_cache[tu] = {"data": None, "ts": now_ts}
+
+    return result
+
+
+def get_upcoming_dividends(tickers: list[str]) -> dict:
+    """Return next upcoming dividend per ticker.
+
+    Calls /v3/reference/dividends with ex_dividend_date >= today (Polygon free tier).
+    Cached 24 hours. Returns {TICKER: {ex_dividend_date, cash_amount, pay_date,
+    frequency, days_out}}.
+    """
+    from datetime import datetime
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    today = datetime.now()
+    now_ts = _time.time()
+    result = {}
+    to_fetch = []
+
+    for ticker in tickers:
+        tu = ticker.upper()
+        cached = _dividends_cache.get(tu)
+        if cached and now_ts - cached["ts"] < _DIVIDENDS_TTL:
+            if cached["data"]:
+                result[tu] = cached["data"]
+        else:
+            to_fetch.append(tu)
+
+    for i, tu in enumerate(to_fetch):
+        if i > 0:
+            _time.sleep(12)
+        try:
+            resp = requests.get(
+                f"{POLYGON_BASE}/v3/reference/dividends",
+                params={
+                    "ticker": tu,
+                    "ex_dividend_date.gte": today_str,
+                    "limit": 1,
+                    "order": "asc",
+                    "sort": "ex_dividend_date",
+                    "apiKey": _key(),
+                },
+                timeout=10,
+            )
+            entry = None
+            if resp.status_code == 200:
+                items = resp.json().get("results", [])
+                if items:
+                    d = items[0]
+                    ex_date = d.get("ex_dividend_date", "")[:10]
+                    if len(ex_date) == 10:
+                        days_out = (datetime.strptime(ex_date, "%Y-%m-%d") - today).days
+                        entry = {
+                            "ex_dividend_date": ex_date,
+                            "cash_amount": d.get("cash_amount"),
+                            "pay_date": d.get("pay_date"),
+                            "frequency": d.get("frequency"),
+                            "days_out": days_out,
+                        }
+                        result[tu] = entry
+            elif resp.status_code == 429:
+                print(f"[polygon] dividends rate-limited — stopping at {tu}", flush=True)
+                break
+            _dividends_cache[tu] = {"data": entry, "ts": now_ts}
+        except Exception as e:
+            print(f"[polygon] dividends/{tu}: {type(e).__name__}", flush=True)
+            _dividends_cache[tu] = {"data": None, "ts": now_ts}
+
+    return result

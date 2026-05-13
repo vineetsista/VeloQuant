@@ -51,7 +51,7 @@ export default function SignIn() {
             fontSize: 12, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase',
             background: 'linear-gradient(120deg, var(--text) 0%, var(--accent-b) 100%)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-          }}>RIA Intelligence</div>
+          }}>VeloQuant</div>
         </div>
 
         <div className="card card-glow" style={{ padding: 36 }}>
@@ -60,7 +60,7 @@ export default function SignIn() {
               Welcome back
             </div>
             <div style={{ fontSize: 14, color: 'var(--text-2)', lineHeight: 1.6 }}>
-              Sign in to your RIA Intelligence account.
+              Sign in to your VeloQuant account.
             </div>
           </div>
 

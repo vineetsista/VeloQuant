@@ -18,6 +18,7 @@ import TermsOfService from './pages/TermsOfService'
 import Disclaimer from './pages/Disclaimer'
 import Contact from './pages/Contact'
 import Unsubscribe from './pages/Unsubscribe'
+import VerifyEmailChange from './pages/VerifyEmailChange'
 import Watchlist from './pages/Watchlist'
 import MarketBar from './components/MarketBar'
 import { getAdvisorId, clearAdvisorId, api } from './api'
@@ -42,10 +43,15 @@ function AppLayout() {
   useEffect(() => {
     if (getAdvisorId()) {
       api.getAdvisor().then(setAdvisor).catch(() => {})
+    }
+  }, [])
+
+  useEffect(() => {
+    if (getAdvisorId()) {
       api.getFilingAlerts(true).then(a => setUnreadAlerts(a.length)).catch(() => {})
       api.getUnreadPriceAlerts().then(setUnreadPriceAlerts).catch(() => {})
     }
-  }, [])
+  }, [location.pathname])
 
   // Handle checkout return
   useEffect(() => {
@@ -68,6 +74,9 @@ function AppLayout() {
   }
   if (location.pathname === '/verify-email') {
     return <Routes><Route path="/verify-email" element={<VerifyEmail />} /></Routes>
+  }
+  if (location.pathname === '/verify-email-change') {
+    return <Routes><Route path="/verify-email-change" element={<VerifyEmailChange />} /></Routes>
   }
   if (location.pathname === '/forgot-password') {
     return <Routes><Route path="/forgot-password" element={<ForgotPassword />} /></Routes>
@@ -112,7 +121,7 @@ function AppLayout() {
         <div className="sidebar-brand">
           <div className="brand-logo">◆</div>
           <div className="brand-text">
-            <div className="brand-name">RIA Intelligence</div>
+            <div className="brand-name">VeloQuant</div>
             <div className="brand-sub">Morning Platform</div>
           </div>
         </div>
@@ -256,7 +265,7 @@ function AppLayout() {
 
       <main className="main-content" style={{ padding: 0, display: 'flex', flexDirection: 'column' }}>
         <MarketBar onMenuClick={() => setSidebarOpen(v => !v)} />
-        <div style={{ padding: '24px 28px', flex: 1 }}>
+        <div className="content-pad">
           <Routes>
             <Route path="/"              element={<Dashboard />} />
             <Route path="/holdings"      element={<Holdings />} />

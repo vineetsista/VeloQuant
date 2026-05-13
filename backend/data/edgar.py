@@ -7,7 +7,7 @@ EDGAR_BASE = "https://data.sec.gov"
 SEC_BASE = "https://www.sec.gov"
 
 HEADERS = {
-    "User-Agent": "RIA Intelligence Platform vineet.sista@gmail.com",
+    "User-Agent": "VeloQuant vineet.sista@gmail.com",
     "Accept-Encoding": "gzip, deflate",
 }
 

@@ -22,7 +22,7 @@ export default function TermsOfService() {
         <div style={{ fontSize: 14.5, lineHeight: 1.85, color: 'var(--text-2)' }}>
 
           <Section title="1. Acceptance of Terms">
-            By accessing or using the RIA Intelligence platform (the "Service"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, do not use the Service. These Terms form a binding agreement between you and RIA Intelligence ("we," "us," or "our").
+            By accessing or using the VeloQuant platform (the "Service"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, do not use the Service. These Terms form a binding agreement between you and VeloQuant ("we," "us," or "our").
           </Section>
 
           <Section title="2. Eligibility">
@@ -30,7 +30,7 @@ export default function TermsOfService() {
           </Section>
 
           <Section title="3. Description of Service">
-            RIA Intelligence provides:
+            VeloQuant provides:
             <ul style={{ margin: '8px 0', paddingLeft: 20 }}>
               <li style={{ marginBottom: 8 }}>AI-generated morning briefings summarizing market data, SEC filings, and news relevant to your tracked holdings</li>
               <li style={{ marginBottom: 8 }}>SEC filing alerts for companies in your portfolio</li>
@@ -75,7 +75,7 @@ export default function TermsOfService() {
           </Section>
 
           <Section title="8. Intellectual Property">
-            The Service, including its interface, design, and underlying software, is owned by RIA Intelligence and protected by intellectual property laws. Your account and briefing history are yours. You retain ownership of the portfolio data you enter.
+            The Service, including its interface, design, and underlying software, is owned by VeloQuant and protected by intellectual property laws. Your account and briefing history are yours. You retain ownership of the portfolio data you enter.
             <br /><br />
             AI-generated briefing content is provided for your personal professional use. You may share briefing summaries with your clients in the normal course of your advisory business.
           </Section>
@@ -91,7 +91,7 @@ export default function TermsOfService() {
           </Section>
 
           <Section title="11. Indemnification">
-            You agree to indemnify and hold harmless RIA Intelligence from any claims, damages, or expenses (including legal fees) arising from your use of the Service, your violation of these Terms, or any content you share with third parties that was generated or modified using the Service.
+            You agree to indemnify and hold harmless VeloQuant from any claims, damages, or expenses (including legal fees) arising from your use of the Service, your violation of these Terms, or any content you share with third parties that was generated or modified using the Service.
           </Section>
 
           <Section title="12. Termination">

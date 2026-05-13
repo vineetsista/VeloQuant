@@ -19,11 +19,16 @@ export default function ClientEmails() {
   const [genForm, setGenForm] = useState({ ticker: '', company: '', event: '' })
   const [showForm, setShowForm] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [deleting, setDeleting] = useState(null)
   const [filter, setFilter] = useState('all')
   const [searchParams, setSearchParams] = useSearchParams()
+  const [holdings, setHoldings] = useState([])
+  const [contacts, setContacts] = useState([])
 
   useEffect(() => {
     load()
+    api.getHoldings().then(setHoldings).catch(() => {})
+    api.getContacts().then(setContacts).catch(() => {})
     // Pre-fill from filing alert shortcut
     const ticker = searchParams.get('ticker')
     const event = searchParams.get('event')
@@ -50,6 +55,19 @@ export default function ClientEmails() {
       setEmails(prev => prev.map(e => e.id === id ? updated : e))
       if (selected?.id === id) setSelected(updated)
     } catch (e) { setError(e.message) }
+  }
+
+  async function handleDelete(id) {
+    setDeleting(id)
+    try {
+      await api.deleteClientEmail(id)
+      setEmails(prev => {
+        const next = prev.filter(e => e.id !== id)
+        if (selected?.id === id) setSelected(next[0] || null)
+        return next
+      })
+    } catch (e) { setError(e.message) }
+    finally { setDeleting(null) }
   }
 
   async function handleGenerate(e) {
@@ -92,10 +110,18 @@ export default function ClientEmails() {
 
   const selParsed = selected ? parseEmail(selected.draft_content) : null
 
+  const matchedContacts = (() => {
+    if (!selected || !contacts.length || !holdings.length) return []
+    const ticker = selected.ticker?.toUpperCase()
+    const tags = new Set(holdings.filter(h => h.ticker.toUpperCase() === ticker).map(h => h.client_tag).filter(Boolean))
+    if (!tags.size) return []
+    return contacts.filter(c => c.client_tag && tags.has(c.client_tag))
+  })()
+
   return (
     <div>
       <div className="page-header">
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <div className="page-header-actions" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <div>
             <div className="page-title">Client Emails</div>
             <div className="page-subtitle">{pending} draft{pending !== 1 ? 's' : ''} ready · {emails.length - pending} sent</div>
@@ -163,7 +189,7 @@ export default function ClientEmails() {
           </div>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 20, alignItems: 'start' }}>
+        <div className="split-panel">
           {/* List */}
           <div>
             <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
@@ -193,6 +219,7 @@ export default function ClientEmails() {
                       background: isSelected ? 'rgba(79,124,246,0.08)' : 'var(--surface)',
                       opacity: email.sent ? 0.6 : 1,
                       transition: 'all 0.14s',
+                      position: 'relative',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
@@ -200,6 +227,12 @@ export default function ClientEmails() {
                       <span className={`badge ${email.sent ? 'badge-green' : 'badge-yellow'}`} style={{ fontSize: 10 }}>
                         {email.sent ? 'Sent' : 'Draft'}
                       </span>
+                      <button
+                        onClick={ev => { ev.stopPropagation(); handleDelete(email.id) }}
+                        disabled={deleting === email.id}
+                        style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--text-2)', cursor: 'pointer', fontSize: 13, padding: '0 2px', opacity: 0, transition: 'opacity 0.15s' }}
+                        className="email-delete-btn"
+                      >✕</button>
                     </div>
                     <div style={{ fontSize: 12, fontWeight: 600, color: isSelected ? 'var(--accent)' : 'var(--text)', lineHeight: 1.4, marginBottom: 3 }}>
                       {subject || 'Client Email'}
@@ -253,6 +286,18 @@ export default function ClientEmails() {
                     >
                       ✉ Open in Mail
                     </button>
+                    {matchedContacts.map(c => {
+                      const { subject, body } = selParsed
+                      return (
+                        <button key={c.id}
+                          onClick={() => window.open(`mailto:${encodeURIComponent(c.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_self')}
+                          style={{ fontSize: 12, padding: '5px 12px', borderRadius: 8, border: '1px solid rgba(6,182,212,0.35)', background: 'rgba(6,182,212,0.06)', color: '#06b6d4', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, whiteSpace: 'nowrap' }}
+                          title={c.email}
+                        >
+                          ✉ {c.name}
+                        </button>
+                      )
+                    })}
                     {!selected.sent && (
                       <button className="btn btn-primary btn-sm" onClick={() => handleMarkSent(selected.id)} style={{ fontSize: 12 }}>
                         ✓ Mark Sent
@@ -284,6 +329,7 @@ export default function ClientEmails() {
           )}
         </div>
       )}
+      <style>{`.email-delete-btn { opacity: 0 !important } div:hover > .email-delete-btn { opacity: 1 !important }`}</style>
     </div>
   )
 }

@@ -15,6 +15,7 @@ function alertDescription(a) {
 
 export default function Watchlist() {
   const [alerts, setAlerts] = useState([])
+  const [prices, setPrices] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [form, setForm] = useState({ ticker: '', alert_type: 'above', threshold: '' })
@@ -25,7 +26,14 @@ export default function Watchlist() {
 
   async function load() {
     setLoading(true)
-    try { setAlerts(await api.getPriceAlerts()) }
+    try {
+      const a = await api.getPriceAlerts()
+      setAlerts(a)
+      const activeTickers = [...new Set(a.filter(x => x.active).map(x => x.ticker))]
+      if (activeTickers.length > 0) {
+        api.getMarketPrices(activeTickers).then(setPrices).catch(() => {})
+      }
+    }
     catch (e) { setError(e.message) }
     finally { setLoading(false) }
   }
@@ -52,6 +60,20 @@ export default function Watchlist() {
   async function handleMarkRead(id) {
     try {
       const updated = await api.markPriceAlertRead(id)
+      setAlerts(prev => prev.map(a => a.id === id ? updated : a))
+    } catch (e) { setError(e.message) }
+  }
+
+  async function handleMarkAllRead() {
+    try {
+      await api.markAllPriceAlertsRead()
+      setAlerts(prev => prev.map(a => a.active ? a : { ...a, read: true }))
+    } catch (e) { setError(e.message) }
+  }
+
+  async function handleReactivate(id) {
+    try {
+      const updated = await api.reactivatePriceAlert(id)
       setAlerts(prev => prev.map(a => a.id === id ? updated : a))
     } catch (e) { setError(e.message) }
   }
@@ -128,6 +150,16 @@ export default function Watchlist() {
               {adding ? <><div className="spin spin-sm" />Adding...</> : '+ Set Alert'}
             </button>
           </div>
+          {form.threshold && (() => {
+            const v = parseFloat(form.threshold)
+            if (form.alert_type === 'pct_day' && v > 0 && v < 0.5)
+              return <div style={{ fontSize: 11, color: 'var(--warning)', marginTop: 8 }}>⚠ Tip: A threshold under 0.5% may trigger very frequently for volatile stocks.</div>
+            if (form.alert_type === 'pct_day' && v > 25)
+              return <div style={{ fontSize: 11, color: 'var(--warning)', marginTop: 8 }}>⚠ Tip: A 25%+ single-day move is rare — consider a lower threshold.</div>
+            if ((form.alert_type === 'above' || form.alert_type === 'below') && v <= 0)
+              return <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 8 }}>Price threshold must be greater than zero.</div>
+            return null
+          })()}
           <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 8 }}>
             Alerts are checked each morning at 7:30am ET using prior-close prices.
           </div>
@@ -135,7 +167,8 @@ export default function Watchlist() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: 'var(--surface)', borderRadius: 10, padding: 4, width: 'fit-content' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 4, background: 'var(--surface)', borderRadius: 10, padding: 4 }}>
         {[['active', `Active (${active.length})`], ['history', `History (${triggered.length})`]].map(([key, label]) => (
           <button
             key={key}
@@ -157,6 +190,16 @@ export default function Watchlist() {
           </button>
         ))}
       </div>
+      {tab === 'history' && unread > 0 && (
+        <button
+          className="btn btn-outline"
+          onClick={handleMarkAllRead}
+          style={{ fontSize: 12, padding: '6px 14px' }}
+        >
+          ✓ Mark all read
+        </button>
+      )}
+      </div>
 
       {/* Active alerts */}
       {tab === 'active' && (
@@ -168,35 +211,67 @@ export default function Watchlist() {
             </div>
           </div>
         ) : (
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="card holdings-table-card" style={{ padding: 0, overflow: 'hidden' }}>
             <table className="table">
               <thead>
                 <tr>
                   <th>Ticker</th>
                   <th>Condition</th>
+                  <th>Current</th>
+                  <th>Distance</th>
                   <th>Set On</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
-                {active.map(a => (
-                  <tr key={a.id}>
-                    <td><span className="chip">{a.ticker}</span></td>
-                    <td>
-                      <span style={{ fontSize: 13, color: 'var(--text)' }}>{alertDescription(a)}</span>
-                    </td>
-                    <td>
-                      <span style={{ fontSize: 12, color: 'var(--text-2)' }}>
-                        {new Date(a.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </span>
-                    </td>
-                    <td>
-                      <button className="btn btn-danger btn-sm" onClick={() => handleDelete(a.id)} style={{ fontSize: 11 }}>
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {active.map(a => {
+                  const price = prices[a.ticker.toUpperCase()]
+                  const currentPrice = price?.close
+                  const threshold = parseFloat(a.threshold)
+                  let distancePct = null
+                  let distanceLabel = null
+                  let distanceColor = 'var(--text-2)'
+                  if (currentPrice && a.alert_type !== 'pct_day') {
+                    distancePct = ((threshold - currentPrice) / currentPrice * 100)
+                    if (a.alert_type === 'above') {
+                      distancePct = (threshold - currentPrice) / currentPrice * 100
+                      distanceColor = distancePct < 2 ? 'var(--warning)' : 'var(--text-2)'
+                      distanceLabel = distancePct >= 0 ? `${distancePct.toFixed(1)}% away` : 'Passed'
+                    } else {
+                      distancePct = (currentPrice - threshold) / currentPrice * 100
+                      distanceColor = distancePct < 2 ? 'var(--warning)' : 'var(--text-2)'
+                      distanceLabel = distancePct >= 0 ? `${distancePct.toFixed(1)}% away` : 'Passed'
+                    }
+                  }
+                  return (
+                    <tr key={a.id}>
+                      <td><span className="chip">{a.ticker}</span></td>
+                      <td>
+                        <span style={{ fontSize: 13, color: 'var(--text)' }}>{alertDescription(a)}</span>
+                      </td>
+                      <td>
+                        {currentPrice != null
+                          ? <span style={{ fontSize: 13, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>${Number(currentPrice).toFixed(2)}</span>
+                          : <span style={{ color: 'var(--text-2)', fontSize: 12 }}>—</span>}
+                      </td>
+                      <td>
+                        {distanceLabel
+                          ? <span style={{ fontSize: 12, fontWeight: 600, color: distanceColor }}>{distanceLabel}</span>
+                          : <span style={{ color: 'var(--text-2)', fontSize: 12 }}>—</span>}
+                      </td>
+                      <td>
+                        <span style={{ fontSize: 12, color: 'var(--text-2)' }}>
+                          {new Date(a.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+                      </td>
+                      <td>
+                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(a.id)} style={{ fontSize: 11 }}>
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -244,6 +319,9 @@ export default function Watchlist() {
                       Mark Read
                     </button>
                   )}
+                  <button className="btn btn-outline btn-sm" onClick={() => handleReactivate(a.id)} style={{ fontSize: 11, color: 'var(--success)' }} title="Re-arm this alert to watch for the same condition again">
+                    ↺ Re-arm
+                  </button>
                   <button className="btn btn-danger btn-sm" onClick={() => handleDelete(a.id)} style={{ fontSize: 11 }}>
                     Delete
                   </button>

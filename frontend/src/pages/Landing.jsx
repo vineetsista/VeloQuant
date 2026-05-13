@@ -14,7 +14,7 @@ const PROGRESS_MESSAGES = [
 const FEATURES = [
   {
     icon: '≋',
-    title: 'Morning Intelligence Briefing',
+    title: 'Morning Briefing',
     desc: 'A buy-side analyst quality briefing generated specifically for your holdings. Every item tied to a specific position with the exact investment thesis implication — not generic market commentary.',
   },
   {
@@ -30,7 +30,7 @@ const FEATURES = [
 ]
 
 const FAQS = [
-  { q: 'How is this different from Bloomberg or FactSet?', a: 'Bloomberg gives you raw data — you still have to synthesize it into insights. RIA Intelligence takes your specific holdings, pulls the data automatically overnight, and hands you a briefing written for your book of business. It\'s the analyst you can\'t afford to hire.' },
+  { q: 'How is this different from Bloomberg or FactSet?', a: 'Bloomberg gives you raw data — you still have to synthesize it into insights. VeloQuant takes your specific holdings, pulls the data automatically overnight, and hands you a briefing written for your book of business. It\'s the analyst you can\'t afford to hire.' },
   { q: 'How does it know what to monitor?', a: 'You enter your holdings as tickers. The platform monitors SEC EDGAR for 10-K, 10-Q, and 8-K filings, fetches overnight price movements, and scans financial news — all filtered to the positions you actually hold.' },
   { q: 'What time does the briefing arrive?', a: 'Briefings are generated and sent to your email by 7:30am ET every weekday. You can also generate a manual briefing at any time from the dashboard.' },
   { q: 'Is my client data secure?', a: 'You only enter stock tickers — not client names or account details. All data is encrypted in transit and at rest. The platform never has access to your CRM or custodian data.' },
@@ -107,7 +107,7 @@ export default function Landing() {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 14, color: '#fff', fontWeight: 900,
           }}>◆</div>
-          <span style={{ fontWeight: 800, fontSize: 15, letterSpacing: '-0.02em' }}>RIA Intelligence</span>
+          <span style={{ fontWeight: 800, fontSize: 15, letterSpacing: '-0.02em' }}>VeloQuant</span>
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <button
@@ -240,7 +240,7 @@ export default function Landing() {
             }}>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 6 }}>
-                  Morning Intelligence Briefing
+                  Morning Briefing
                 </div>
                 <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em', marginBottom: 4 }}>
                   {date}
@@ -420,7 +420,7 @@ export default function Landing() {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 11, color: '#fff', fontWeight: 900,
           }}>◆</div>
-          <span style={{ fontSize: 13, fontWeight: 700 }}>RIA Intelligence</span>
+          <span style={{ fontSize: 13, fontWeight: 700 }}>VeloQuant</span>
           <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 8 }}>© 2026</span>
         </div>
         <div style={{ display: 'flex', gap: 24, alignItems: 'center', flexWrap: 'wrap' }}>

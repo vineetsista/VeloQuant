@@ -30,14 +30,14 @@ export default function Disclaimer() {
         }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--warning)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Important Notice</div>
           <div style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--text)' }}>
-            RIA Intelligence is a productivity platform for financial professionals. It does <strong>not</strong> provide investment advice. All AI-generated content must be independently verified before use in client communications or investment decisions.
+            VeloQuant is a productivity platform for financial professionals. It does <strong>not</strong> provide investment advice. All AI-generated content must be independently verified before use in client communications or investment decisions.
           </div>
         </div>
 
         <div style={{ fontSize: 14.5, lineHeight: 1.85, color: 'var(--text-2)' }}>
 
           <Section title="Not Investment Advice">
-            RIA Intelligence is not a registered investment advisor, broker-dealer, or financial planner. Nothing provided through this platform — including morning briefings, SEC filing summaries, market data summaries, client email drafts, or any other content — constitutes investment advice, a recommendation to buy or sell any security, or financial planning advice of any kind.
+            VeloQuant is not a registered investment advisor, broker-dealer, or financial planner. Nothing provided through this platform — including morning briefings, SEC filing summaries, market data summaries, client email drafts, or any other content — constitutes investment advice, a recommendation to buy or sell any security, or financial planning advice of any kind.
             <br /><br />
             The platform is designed as a productivity and research tool to help registered investment advisors work more efficiently. All investment decisions remain solely your responsibility and the responsibility of your clients.
           </Section>
@@ -80,7 +80,7 @@ export default function Disclaimer() {
           <Section title="Regulatory Compliance">
             You are responsible for ensuring that your use of this platform — including any client communications drafted or assisted by this platform — complies with all applicable regulations, including but not limited to SEC and FINRA rules, your firm's compliance policies, and applicable state regulations governing investment advisors.
             <br /><br />
-            RIA Intelligence makes no representation that the use of AI-generated client communications complies with your specific regulatory obligations. Consult your compliance officer before using AI-drafted content in client communications.
+            VeloQuant makes no representation that the use of AI-generated client communications complies with your specific regulatory obligations. Consult your compliance officer before using AI-drafted content in client communications.
           </Section>
 
           <Section title="No Guarantees">

@@ -22,7 +22,7 @@ export default function PrivacyPolicy() {
         <div style={{ fontSize: 14.5, lineHeight: 1.85, color: 'var(--text-2)' }}>
 
           <Section title="1. Overview">
-            RIA Intelligence ("we," "us," or "our") operates the RIA Intelligence platform, a morning briefing and portfolio monitoring service for registered investment advisors. This Privacy Policy explains how we collect, use, and protect your information when you use our platform at riaplatform-production.up.railway.app (the "Service").
+            VeloQuant ("we," "us," or "our") operates the VeloQuant platform, a morning briefing and portfolio monitoring service for registered investment advisors. This Privacy Policy explains how we collect, use, and protect your information when you use our platform at veloquant.net (the "Service").
           </Section>
 
           <Section title="2. Information We Collect">

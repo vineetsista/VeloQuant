@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 import anthropic
 
-from data.polygon import get_portfolio_market_data
+from data.polygon import get_portfolio_market_data, get_upcoming_earnings
 from data.edgar import get_new_filings_for_portfolio
 
 _client = None
@@ -36,11 +36,20 @@ def _build_user_message(
     holdings: list[dict],
     market_data: dict,
     filings: list[dict],
+    earnings: dict = None,
+    briefing_focus: str = None,
 ) -> str:
-    holdings_lines = "\n".join(
-        f"  - {h['ticker']}: ${float(h['position_size']):,.0f} position"
-        for h in holdings
-    )
+    holdings_lines_parts = []
+    for h in holdings:
+        line = f"  - {h['ticker']}: ${float(h['position_size']):,.0f} cost basis"
+        if h.get('shares'):
+            line += f" · {float(h['shares']):,.2f} shares"
+        if h.get('client_tag'):
+            line += f" · Client: {h['client_tag']}"
+        if h.get('notes'):
+            line += f"\n    Advisor note: {h['notes']}"
+        holdings_lines_parts.append(line)
+    holdings_lines = "\n".join(holdings_lines_parts)
 
     price_lines = []
     news_lines = []
@@ -73,9 +82,21 @@ def _build_user_message(
             f"{f['form']} filed {f['filing_date']}\n    Excerpt: {excerpt}..."
         )
 
+    earnings_lines = []
+    if earnings:
+        held = {h["ticker"].upper() for h in holdings}
+        for ticker, e in earnings.items():
+            if ticker in held and e.get("days_out") is not None and e["days_out"] <= 14:
+                d = e["days_out"]
+                label = "today (est.)" if d <= 0 else ("tomorrow (est.)" if d == 1 else f"in {d} days (est. {e['next_est']})")
+                earnings_lines.append(f"  - {ticker}: reports earnings {label}")
+
     prices_section = "\n".join(price_lines) if price_lines else "  No price data available"
     news_section = "\n".join(news_lines) if news_lines else "  No recent news"
     filings_section = "\n".join(filing_lines) if filing_lines else "  No new SEC filings in this period"
+    earnings_section = "\n".join(earnings_lines) if earnings_lines else "  None within 14 days"
+
+    focus_section = f"\nADVISOR FOCUS FOR TODAY:\n{briefing_focus}\n" if briefing_focus and briefing_focus.strip() else ""
 
     return f"""Prepare a morning briefing for the following advisor and portfolio.
 
@@ -95,6 +116,8 @@ RECENT NEWS (last 48 hours):
 RECENT SEC FILINGS:
 {filings_section}
 
+UPCOMING EARNINGS (within 14 days):
+{earnings_section}{focus_section}
 ---
 
 Write 3-5 briefing items. Hard rules:
@@ -119,6 +142,7 @@ def generate_morning_briefing(
     firm_name: str,
     holdings: list[dict],
     days_back_filings: int = 1,
+    briefing_focus: str = None,
 ) -> str:
     """
     Gather market data + filings for the portfolio, then generate a briefing via Claude.
@@ -126,9 +150,10 @@ def generate_morning_briefing(
     """
     tickers = [h["ticker"] for h in holdings]
 
-    with ThreadPoolExecutor(max_workers=2) as executor:
+    with ThreadPoolExecutor(max_workers=3) as executor:
         market_future = executor.submit(get_portfolio_market_data, tickers)
         filings_future = executor.submit(get_new_filings_for_portfolio, tickers, days_back=days_back_filings)
+        earnings_future = executor.submit(get_upcoming_earnings, tickers)
         try:
             market_data = market_future.result(timeout=25)
         except Exception:
@@ -137,8 +162,12 @@ def generate_morning_briefing(
             filings = filings_future.result(timeout=25)
         except Exception:
             filings = []
+        try:
+            earnings = earnings_future.result(timeout=300)
+        except Exception:
+            earnings = {}
 
-    user_message = _build_user_message(advisor_name, firm_name, holdings, market_data, filings)
+    user_message = _build_user_message(advisor_name, firm_name, holdings, market_data, filings, earnings, briefing_focus)
 
     response = _get_client().messages.create(
         model="claude-sonnet-4-6",
@@ -164,11 +193,20 @@ def generate_and_save_briefing(advisor_id: int, flask_app) -> dict:
             raise ValueError(f"Advisor {advisor_id} has no holdings")
 
         holdings_data = [
-            {"ticker": h.ticker, "position_size": float(h.position_size)}
+            {
+                "ticker": h.ticker,
+                "position_size": float(h.position_size),
+                "shares": float(h.shares) if h.shares is not None else None,
+                "notes": h.notes,
+                "client_tag": h.client_tag,
+            }
             for h in holdings
         ]
 
-        content = generate_morning_briefing(advisor.name, advisor.firm_name, holdings_data)
+        content = generate_morning_briefing(
+            advisor.name, advisor.firm_name, holdings_data,
+            briefing_focus=advisor.briefing_focus,
+        )
 
         briefing = Briefing(
             advisor_id=advisor_id,

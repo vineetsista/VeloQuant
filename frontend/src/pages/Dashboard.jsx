@@ -6,8 +6,66 @@ import { useToast } from '../components/Toast'
 
 const CHART_COLORS = ['#4f7cf6','#06b6d4','#10d97b','#f59e0b','#8b5cf6','#ec4899','#f97316','#ef4444']
 
-function AllocationChart({ holdings }) {
-  const total = holdings.reduce((s, h) => s + parseFloat(h.position_size || 0), 0)
+const SECTOR_MAP = {
+  AAPL:'Technology', MSFT:'Technology', NVDA:'Technology', AVGO:'Technology',
+  ORCL:'Technology', CRM:'Technology', AMD:'Technology', INTC:'Technology',
+  QCOM:'Technology', NOW:'Technology', ADBE:'Technology', CSCO:'Technology',
+  IBM:'Technology', TXN:'Technology', AMAT:'Technology', MU:'Technology',
+  PANW:'Technology', SNOW:'Technology', ACN:'Technology', INTU:'Technology',
+  KLAC:'Technology', LRCX:'Technology', PLTR:'Technology', SHOP:'Technology',
+  GOOGL:'Comm. Services', GOOG:'Comm. Services', META:'Comm. Services',
+  NFLX:'Comm. Services', DIS:'Comm. Services', T:'Comm. Services',
+  VZ:'Comm. Services', TMUS:'Comm. Services', CHTR:'Comm. Services', EA:'Comm. Services',
+  AMZN:'Consumer Disc.', TSLA:'Consumer Disc.', HD:'Consumer Disc.',
+  MCD:'Consumer Disc.', NKE:'Consumer Disc.', LOW:'Consumer Disc.',
+  SBUX:'Consumer Disc.', TGT:'Consumer Disc.', BKNG:'Consumer Disc.',
+  CMG:'Consumer Disc.', GM:'Consumer Disc.', F:'Consumer Disc.',
+  PG:'Consumer Staples', KO:'Consumer Staples', PEP:'Consumer Staples',
+  WMT:'Consumer Staples', COST:'Consumer Staples', MDLZ:'Consumer Staples',
+  CL:'Consumer Staples', GIS:'Consumer Staples', KHC:'Consumer Staples', MNST:'Consumer Staples',
+  UNH:'Healthcare', LLY:'Healthcare', JNJ:'Healthcare', PFE:'Healthcare',
+  ABBV:'Healthcare', MRK:'Healthcare', TMO:'Healthcare', ABT:'Healthcare',
+  DHR:'Healthcare', BMY:'Healthcare', MDT:'Healthcare', ISRG:'Healthcare',
+  CVS:'Healthcare', REGN:'Healthcare', VRTX:'Healthcare', GILD:'Healthcare', ZTS:'Healthcare', SYK:'Healthcare',
+  JPM:'Financials', BAC:'Financials', WFC:'Financials', GS:'Financials',
+  MS:'Financials', BLK:'Financials', C:'Financials', AXP:'Financials',
+  V:'Financials', MA:'Financials', PYPL:'Financials', COF:'Financials',
+  USB:'Financials', TFC:'Financials', PNC:'Financials', SCHW:'Financials',
+  CB:'Financials', MET:'Financials', PRU:'Financials',
+  CAT:'Industrials', BA:'Industrials', HON:'Industrials', RTX:'Industrials',
+  UPS:'Industrials', GE:'Industrials', DE:'Industrials', LMT:'Industrials',
+  NOC:'Industrials', MMM:'Industrials', FDX:'Industrials', EMR:'Industrials',
+  PH:'Industrials', ETN:'Industrials', NSC:'Industrials', CSX:'Industrials',
+  UNP:'Industrials', CARR:'Industrials', CTAS:'Industrials',
+  XOM:'Energy', CVX:'Energy', COP:'Energy', SLB:'Energy', EOG:'Energy',
+  OXY:'Energy', MPC:'Energy', PSX:'Energy', VLO:'Energy', HAL:'Energy',
+  DVN:'Energy', WMB:'Energy', KMI:'Energy',
+  NEE:'Utilities', DUK:'Utilities', SO:'Utilities', AEP:'Utilities',
+  D:'Utilities', EXC:'Utilities', XEL:'Utilities', ED:'Utilities', PPL:'Utilities',
+  AMT:'Real Estate', PLD:'Real Estate', CCI:'Real Estate', EQIX:'Real Estate',
+  SPG:'Real Estate', O:'Real Estate', WELL:'Real Estate', PSA:'Real Estate',
+  LIN:'Materials', SHW:'Materials', FCX:'Materials', NEM:'Materials',
+  APD:'Materials', ECL:'Materials', DD:'Materials', NUE:'Materials',
+  SPY:'ETF', IVV:'ETF', VTI:'ETF', VOO:'ETF', DIA:'ETF', IWM:'ETF', QQQ:'ETF',
+  VNQ:'ETF', GLD:'ETF', SLV:'ETF', TLT:'ETF', BND:'ETF', AGG:'ETF', EFA:'ETF', EEM:'ETF',
+  XLK:'Technology', XLF:'Financials', XLE:'Energy', XLV:'Healthcare',
+  XLI:'Industrials', XLC:'Comm. Services', XLY:'Consumer Disc.',
+  XLP:'Consumer Staples', XLU:'Utilities', XLB:'Materials', XLRE:'Real Estate',
+}
+
+const SECTOR_COLORS = {
+  'Technology':'#4f7cf6', 'Comm. Services':'#06b6d4', 'Consumer Disc.':'#8b5cf6',
+  'Consumer Staples':'#10d97b', 'Healthcare':'#f59e0b', 'Financials':'#ec4899',
+  'Industrials':'#f97316', 'Energy':'#ef4444', 'Utilities':'#84cc16',
+  'Real Estate':'#14b8a6', 'Materials':'#a78bfa', 'ETF':'#94a3b8', 'Other':'#475569',
+}
+
+function AllocationChart({ holdings, marketData }) {
+  const getValue = (h) => {
+    const close = marketData?.[h.ticker?.toUpperCase()]?.price?.close
+    return (h.shares && close) ? h.shares * close : parseFloat(h.position_size || 0)
+  }
+  const total = holdings.reduce((s, h) => s + getValue(h), 0)
   if (!total || holdings.length === 0) return null
 
   const SIZE = 120, CX = 60, CY = 60, R = 52, IR = 33
@@ -15,7 +73,7 @@ function AllocationChart({ holdings }) {
   let cum = -90
 
   const slices = holdings.map((h, i) => {
-    const pct = parseFloat(h.position_size || 0) / total
+    const pct = getValue(h) / total
     const sweep = pct * 360
     const color = CHART_COLORS[i % CHART_COLORS.length]
     if (holdings.length === 1) return { type: 'circle', color, ticker: h.ticker, pct }
@@ -48,6 +106,62 @@ function AllocationChart({ holdings }) {
             <span style={{ fontSize:11, color:'var(--text-2)', fontVariantNumeric:'tabular-nums', fontWeight:600, minWidth:28, textAlign:'right' }}>
               {(s.pct*100).toFixed(0)}%
             </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function Sparkline({ data, width = 140, height = 30 }) {
+  if (!data || data.length < 2) return null
+  const vals = data.map(d => d.total_value)
+  const min = Math.min(...vals)
+  const max = Math.max(...vals)
+  const range = max - min || 1
+  const pts = vals.map((v, i) => [
+    (i / (vals.length - 1)) * width,
+    height - ((v - min) / range) * (height - 4) - 2,
+  ])
+  const pathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ')
+  const trend = vals[vals.length - 1] >= vals[0]
+  const color = trend ? 'var(--success)' : 'var(--danger)'
+  const last = pts[pts.length - 1]
+  return (
+    <svg width={width} height={height} style={{ display: 'block', flexShrink: 0 }}>
+      <path d={pathD} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={last[0].toFixed(1)} cy={last[1].toFixed(1)} r={2.5} fill={color} />
+    </svg>
+  )
+}
+
+function SectorBreakdown({ holdings, marketData }) {
+  const getValue = (h) => {
+    const close = marketData?.[h.ticker?.toUpperCase()]?.price?.close
+    return (h.shares && close) ? h.shares * close : parseFloat(h.position_size || 0)
+  }
+  const sectors = {}
+  holdings.forEach(h => {
+    const sector = SECTOR_MAP[h.ticker?.toUpperCase()] || 'Other'
+    sectors[sector] = (sectors[sector] || 0) + getValue(h)
+  })
+  const total = Object.values(sectors).reduce((s, v) => s + v, 0)
+  if (!total || Object.keys(sectors).length <= 1) return null
+  const sorted = Object.entries(sectors).sort((a, b) => b[1] - a[1])
+  return (
+    <div style={{ marginBottom: 12, paddingBottom: 14, borderBottom: '1px solid var(--border)' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-2)', marginBottom: 6 }}>Sector Allocation</div>
+      <div style={{ height: 6, borderRadius: 3, display: 'flex', overflow: 'hidden', gap: 1, marginBottom: 8 }}>
+        {sorted.map(([s, v]) => (
+          <div key={s} style={{ flex: v / total, background: SECTOR_COLORS[s] || '#475569', minWidth: 2 }} />
+        ))}
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px 10px' }}>
+        {sorted.map(([s, v]) => (
+          <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }}>
+            <div style={{ width: 5, height: 5, borderRadius: 1, background: SECTOR_COLORS[s] || '#475569', flexShrink: 0 }} />
+            <span style={{ color: 'var(--text-2)', fontWeight: 600 }}>{s}</span>
+            <span style={{ color: 'var(--text-2)' }}>{(v / total * 100).toFixed(0)}%</span>
           </div>
         ))}
       </div>
@@ -111,6 +225,8 @@ export default function Dashboard() {
   const [marketData, setMarketData] = useState({})
   const [alerts, setAlerts] = useState([])
   const [emails, setEmails] = useState([])
+  const [priceAlerts, setPriceAlerts] = useState([])
+  const [snapshots, setSnapshots] = useState([])
   const [generating, setGenerating] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -121,13 +237,14 @@ export default function Dashboard() {
   async function load() {
     setLoading(true)
     try {
-      const [adv, h, a, e] = await Promise.all([
-        api.getAdvisor(), api.getHoldings(), api.getFilingAlerts(), api.getClientEmails(),
+      const [adv, h, a, e, pa] = await Promise.all([
+        api.getAdvisor(), api.getHoldings(), api.getFilingAlerts(), api.getClientEmails(), api.getPriceAlerts(),
       ])
-      setAdvisor(adv); setHoldings(h); setAlerts(a); setEmails(e)
+      setAdvisor(adv); setHoldings(h); setAlerts(a); setEmails(e); setPriceAlerts(pa)
       if (h.length > 0) {
         try { setMarketData(await api.getMarketData()) } catch (_) {}
         try { setBriefing(await api.getLatestBriefing()) } catch (_) {}
+        api.getPortfolioSnapshots(30).then(s => setSnapshots(s)).catch(() => {})
       }
     } catch (e) { setError(e.message) }
     finally { setLoading(false) }
@@ -157,6 +274,14 @@ export default function Dashboard() {
 
   const todayStr = new Date().toDateString()
   const briefingIsToday = briefing && new Date(briefing.generated_at).toDateString() === todayStr
+  const triggeredAlerts = priceAlerts.filter(a => !a.active && !a.read)
+
+  const portfolioTone = briefing?.content
+    ? (briefing.content.match(/overall portfolio tone:\s*(constructive|cautious|mixed)/i)?.[1] || null)
+    : null
+  const toneColor = portfolioTone?.toUpperCase() === 'CONSTRUCTIVE' ? 'var(--success)'
+    : portfolioTone?.toUpperCase() === 'CAUTIOUS' ? 'var(--warning)'
+    : 'var(--accent)'
 
   // First-time empty state
   if (holdings.length === 0) {
@@ -238,8 +363,8 @@ export default function Dashboard() {
             <div className="page-subtitle" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <span>{advisor?.firm_name} · {date}</span>
               {briefingIsToday ? (
-                <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 10, background: 'rgba(16,185,129,0.15)', color: 'var(--success)', letterSpacing: '0.04em' }}>
-                  ◆ Briefing ready · {new Date(briefing.generated_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 10, background: portfolioTone ? `${toneColor}18` : 'rgba(16,185,129,0.15)', color: portfolioTone ? toneColor : 'var(--success)', letterSpacing: '0.04em', border: portfolioTone ? `1px solid ${toneColor}30` : 'none' }}>
+                  ◆ {portfolioTone ? portfolioTone.charAt(0).toUpperCase() + portfolioTone.slice(1).toLowerCase() : 'Briefing ready'} · {new Date(briefing.generated_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                 </span>
               ) : (
                 <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 10px', borderRadius: 10, background: 'rgba(79,124,246,0.1)', color: 'var(--accent)', letterSpacing: '0.04em' }}>
@@ -290,7 +415,33 @@ export default function Dashboard() {
           </div>
           <div className="stat-sub">{pending > 0 ? `${pending} draft${pending !== 1 ? 's' : ''} ready to send` : 'No pending drafts'}</div>
         </div>
+        <div className="stat-card" onClick={() => navigate('/watchlist')} style={{ cursor: triggeredAlerts.length > 0 ? 'pointer' : undefined }}>
+          <div className="stat-label">Price Alerts</div>
+          <div className="stat-value" style={{ color: triggeredAlerts.length > 0 ? 'var(--warning)' : undefined }}>
+            {triggeredAlerts.length}
+          </div>
+          <div className="stat-sub">{triggeredAlerts.length > 0 ? `${triggeredAlerts.length} triggered · tap to review` : `${priceAlerts.filter(a => a.active).length} active`}</div>
+        </div>
       </div>
+
+      {snapshots.length >= 2 && (() => {
+        const first = snapshots[0].total_value
+        const last = snapshots[snapshots.length - 1].total_value
+        const trendPct = first > 0 ? ((last - first) / first) * 100 : 0
+        const trendUp = last >= first
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '10px 16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, marginBottom: 20, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-2)', flexShrink: 0 }}>30d Trend</span>
+            <Sparkline data={snapshots} width={140} height={30} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: trendUp ? 'var(--success)' : 'var(--danger)', fontVariantNumeric: 'tabular-nums' }}>
+              {trendUp ? '+' : ''}{trendPct.toFixed(1)}%
+            </span>
+            <span style={{ fontSize: 12, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>
+              ${(first / 1000).toFixed(0)}K → ${(last / 1000).toFixed(0)}K
+            </span>
+          </div>
+        )
+      })()}
 
       {/* Today's Movers */}
       {holdings.length > 0 && Object.keys(marketData).length > 0 && (() => {
@@ -321,7 +472,7 @@ export default function Dashboard() {
       {/* Morning Briefing */}
       <div className="card card-glow">
         <div className="card-header">
-          <div className="card-title">Morning Intelligence Briefing</div>
+          <div className="card-title">Morning Briefing</div>
           {briefing && <BriefingActions briefing={briefing} advisorEmail={advisor?.email} />}
         </div>
 
@@ -344,6 +495,41 @@ export default function Dashboard() {
         )}
       </div>
 
+      {/* Triggered price alerts */}
+      {triggeredAlerts.length > 0 && (
+        <div className="card" style={{ padding: '14px 20px', marginBottom: 20, border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.03)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--warning)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+              🔔 {triggeredAlerts.length} Price Alert{triggeredAlerts.length !== 1 ? 's' : ''} Triggered
+            </div>
+            <button className="btn btn-outline btn-sm" onClick={() => navigate('/watchlist')} style={{ fontSize: 11 }}>
+              View Watchlist →
+            </button>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {triggeredAlerts.slice(0, 6).map(a => {
+              const label = a.alert_type === 'above'
+                ? `${a.ticker} rose above $${Number(a.threshold).toFixed(2)}`
+                : a.alert_type === 'below'
+                  ? `${a.ticker} fell below $${Number(a.threshold).toFixed(2)}`
+                  : `${a.ticker} moved ±${Number(a.threshold).toFixed(1)}%`
+              return (
+                <span key={a.id} style={{
+                  fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 20,
+                  background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)',
+                  color: 'var(--warning)',
+                }}>
+                  {label}
+                </span>
+              )
+            })}
+            {triggeredAlerts.length > 6 && (
+              <span style={{ fontSize: 12, color: 'var(--text-2)', padding: '4px 0' }}>+{triggeredAlerts.length - 6} more</span>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="grid-2">
         {/* Portfolio */}
         <div className="card">
@@ -355,7 +541,27 @@ export default function Dashboard() {
             <div className="empty" style={{ padding: '24px 0' }}>No holdings yet.</div>
           ) : (
             <>
-            <AllocationChart holdings={holdings} />
+            <AllocationChart holdings={holdings} marketData={marketData} />
+            <SectorBreakdown holdings={holdings} marketData={marketData} />
+            {(() => {
+              const risk = holdings.filter(h => {
+                const close = marketData[h.ticker]?.price?.close
+                const val = (h.shares && close) ? h.shares * close : parseFloat(h.position_size || 0)
+                return totalPortfolio > 0 && val / totalPortfolio >= 0.25
+              })
+              if (!risk.length) return null
+              return (
+                <div style={{ padding: '7px 12px', background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 8, marginBottom: 12, fontSize: 11, color: 'var(--warning)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <span>⚠</span>
+                  {risk.map(h => {
+                    const close = marketData[h.ticker]?.price?.close
+                    const val = (h.shares && close) ? h.shares * close : parseFloat(h.position_size || 0)
+                    return <span key={h.ticker}><strong>{h.ticker}</strong> {(val / totalPortfolio * 100).toFixed(0)}%</span>
+                  })}
+                  <span style={{ color: 'var(--text-2)' }}>· High concentration</span>
+                </div>
+              )
+            })()}
             {holdings.map(h => {
               const md = marketData[h.ticker]?.price
               const pct = md?.pct_change

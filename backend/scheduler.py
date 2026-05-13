@@ -1,7 +1,11 @@
 import logging
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-from email_delivery import send_briefing_email, send_trial_reminder_email
+from email_delivery import (
+    send_briefing_email, send_trial_reminder_email,
+    send_filing_alert_digest_email, send_price_alert_email,
+    send_job_failure_email, send_slack,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +17,7 @@ def run_morning_jobs(flask_app):
     """
     import os
     from datetime import datetime, timezone
-    from models import db, Advisor, Holding, Briefing, PriceAlert
+    from models import db, Advisor, Holding, Briefing, PriceAlert, PortfolioSnapshot
     from intelligence.briefing import generate_and_save_briefing
     from intelligence.filing_analyzer import scan_and_analyze_filings
     from data.polygon import get_snapshot_batch
@@ -32,7 +36,23 @@ def run_morning_jobs(flask_app):
             # Scan new filings first so they are available to the briefing generator
             try:
                 logger.info(f"Scanning filings for advisor {advisor.id} ({advisor.name})")
-                scan_and_analyze_filings(advisor.id, flask_app, days_back=1)
+                new_alerts = scan_and_analyze_filings(advisor.id, flask_app, days_back=1)
+                if new_alerts:
+                    if advisor.filing_alert_email_enabled:
+                        try:
+                            send_filing_alert_digest_email(
+                                advisor.email, advisor.name, advisor.firm_name,
+                                new_alerts, app_url,
+                            )
+                            logger.info(f"Filing digest email sent to {advisor.email} ({len(new_alerts)} alerts)")
+                        except Exception as mail_err:
+                            logger.error(f"Filing digest email failed for {advisor.email}: {mail_err}")
+                    if advisor.slack_webhook_url:
+                        try:
+                            tickers = ", ".join(sorted(set(a["ticker"] for a in new_alerts)))
+                            send_slack(advisor.slack_webhook_url, f"📋 {len(new_alerts)} new SEC filing{'s' if len(new_alerts) != 1 else ''} for your holdings: {tickers}")
+                        except Exception:
+                            pass
             except Exception as e:
                 logger.error(f"Filing scan failed for advisor {advisor.id}: {e}")
 
@@ -44,6 +64,38 @@ def run_morning_jobs(flask_app):
                 logger.info(f"Briefing complete for advisor {advisor.id}")
             except Exception as e:
                 logger.error(f"Briefing generation failed for advisor {advisor.id}: {e}")
+                if advisor.briefing_email_enabled:
+                    try:
+                        send_job_failure_email(advisor.email, advisor.name, app_url)
+                    except Exception:
+                        pass
+
+            # Store daily portfolio snapshot (cached prices, fast)
+            try:
+                snap_tickers = [h.ticker for h in holdings]
+                snap_prices = get_snapshot_batch(snap_tickers)
+                total_val = sum(
+                    float(h.shares) * snap_prices.get(h.ticker.upper(), {}).get("close", 0)
+                    if h.shares and snap_prices.get(h.ticker.upper(), {}).get("close")
+                    else float(h.position_size)
+                    for h in holdings
+                )
+                today_date = datetime.now(timezone.utc).date()
+                existing = PortfolioSnapshot.query.filter_by(advisor_id=advisor.id, date=today_date).first()
+                if not existing and total_val > 0:
+                    db.session.add(PortfolioSnapshot(advisor_id=advisor.id, date=today_date, total_value=total_val))
+                    db.session.commit()
+            except Exception as snap_err:
+                logger.error(f"Portfolio snapshot failed for advisor {advisor.id}: {snap_err}")
+
+            # Slack briefing notification
+            if briefing_dict and advisor.slack_webhook_url:
+                try:
+                    from datetime import datetime, timezone as _tz
+                    today = datetime.now(_tz.utc).strftime("%A, %b %d")
+                    send_slack(advisor.slack_webhook_url, f"◆ Your VeloQuant morning briefing for {today} is ready: {app_url}")
+                except Exception:
+                    pass
 
             # Email delivery
             if briefing_dict and advisor.briefing_email_enabled:
@@ -73,27 +125,47 @@ def run_morning_jobs(flask_app):
             if active:
                 tickers = list(set(a.ticker for a in active))
                 prices = get_snapshot_batch(tickers)
-                triggered = 0
+                triggered_by_advisor = {}  # advisor_id -> [alert.to_dict()]
                 for alert in active:
                     p = prices.get(alert.ticker.upper(), {})
                     close = p.get('close')
                     pct = p.get('pct_change')
                     fired = False
+                    fired_price = close
                     if alert.alert_type == 'above' and close and close >= float(alert.threshold):
                         fired = True
                     elif alert.alert_type == 'below' and close and close <= float(alert.threshold):
                         fired = True
                     elif alert.alert_type == 'pct_day' and pct is not None and abs(pct) >= float(alert.threshold):
                         fired = True
+                        fired_price = pct
                     if fired:
                         alert.active = False
                         alert.triggered_at = datetime.now(timezone.utc)
-                        alert.triggered_price = close
+                        alert.triggered_price = fired_price
                         alert.read = False
-                        triggered += 1
-                if triggered:
+                        triggered_by_advisor.setdefault(alert.advisor_id, []).append(alert.to_dict())
+                total = sum(len(v) for v in triggered_by_advisor.values())
+                if total:
                     db.session.commit()
-                    logger.info(f"Price alerts: {triggered} triggered")
+                    logger.info(f"Price alerts: {total} triggered")
+                    # Send per-advisor notification emails
+                    for adv_id, adv_alerts in triggered_by_advisor.items():
+                        adv = db.session.get(Advisor, adv_id)
+                        if not adv:
+                            continue
+                        if adv.price_alert_email_enabled:
+                            try:
+                                send_price_alert_email(adv.email, adv.name, adv_alerts, app_url)
+                                logger.info(f"Price alert email sent to {adv.email}")
+                            except Exception as mail_err:
+                                logger.error(f"Price alert email failed for {adv.email}: {mail_err}")
+                        if adv.slack_webhook_url:
+                            try:
+                                tickers = ", ".join(sorted(set(a["ticker"] for a in adv_alerts)))
+                                send_slack(adv.slack_webhook_url, f"🔔 Price alert triggered: {tickers} — view your Watchlist: {app_url}/watchlist")
+                            except Exception:
+                                pass
         except Exception as e:
             logger.error(f"Price alert check failed: {e}")
 
@@ -118,7 +190,7 @@ def run_trial_reminders(flask_app):
             delta = trial_end - now
             days = delta.days
 
-            if days in (3, 1):
+            if days in (3, 1, 0):
                 try:
                     sent = send_trial_reminder_email(
                         advisor.email, advisor.name, days, app_url

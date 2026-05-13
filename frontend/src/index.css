@@ -738,6 +738,20 @@ body::after {
   -webkit-backdrop-filter: blur(2px);
 }
 
+/* ── UTILITY LAYOUT CLASSES ─────────────────────────────────────────────── */
+
+.split-panel {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.content-pad {
+  padding: 24px 28px;
+  flex: 1;
+}
+
 /* ── MOBILE BREAKPOINT ───────────────────────────────────────────────────── */
 
 @media (max-width: 768px) {
@@ -778,6 +792,45 @@ body::after {
   .table th { padding: 10px 12px; }
   .table td { padding: 12px 12px; }
 
+  .split-panel { grid-template-columns: 1fr !important; }
+
+  .content-pad { padding: 16px !important; }
+
+  /* Allow horizontal scroll on the wide Holdings table */
+  .holdings-table-card { overflow-x: auto !important; }
+
+  /* Page headers with action buttons should wrap on narrow screens */
+  .page-header-actions {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
   .mobile-menu-btn { display: flex; }
   .mobile-overlay  { display: block; }
+
+  /* Stat cards: reduce oversized numbers that can clip on narrow cards */
+  .stat-value { font-size: 28px; }
+
+  /* Briefing and email content panes: disable sticky when stacked */
+  .split-panel > div:last-child {
+    position: static !important;
+  }
+
+  /* Form rows: wrap fields instead of overflowing */
+  .form-row { flex-wrap: wrap; }
+}
+
+/* Extra-small screens (phones < 480px) */
+@media (max-width: 480px) {
+  .content-pad { padding: 12px !important; }
+
+  .stat-card {
+    min-width: calc(50% - 5px);
+    flex: 0 1 calc(50% - 5px);
+  }
+
+  .page-title { font-size: 19px; }
+
+  /* Stack stat cards in a single column on very narrow screens */
+  .stat-value { font-size: 26px; }
 }

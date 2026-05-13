@@ -25,8 +25,14 @@ class Advisor(db.Model):
     subscription_status = db.Column(db.String(50), nullable=True)  # trialing, active, past_due, canceled, unpaid
     trial_ends_at = db.Column(db.DateTime, nullable=True)
     briefing_email_enabled = db.Column(db.Boolean, nullable=False, default=True, server_default='true')
+    filing_alert_email_enabled = db.Column(db.Boolean, nullable=False, default=True, server_default='true')
+    price_alert_email_enabled = db.Column(db.Boolean, nullable=False, default=True, server_default='true')
     api_key = db.Column(db.String(64), nullable=True, unique=True, index=True)
     unsubscribe_token = db.Column(db.String(64), nullable=True, unique=True, index=True)
+    pending_email = db.Column(db.String(200), nullable=True)
+    email_change_token = db.Column(db.String(100), nullable=True)
+    slack_webhook_url = db.Column(db.String(512), nullable=True)
+    briefing_focus = db.Column(db.String(500), nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def set_password(self, password):
@@ -59,6 +65,15 @@ class Advisor(db.Model):
         if not self.unsubscribe_token:
             self.unsubscribe_token = uuid.uuid4().hex
         return self.unsubscribe_token
+
+    def rotate_api_key(self):
+        self.api_key = uuid.uuid4().hex
+        return self.api_key
+
+    def request_email_change(self, new_email):
+        self.pending_email = new_email.strip().lower()
+        self.email_change_token = secrets.token_urlsafe(32)
+        return self.email_change_token
 
     def is_legacy(self):
         return self.email_verified is None
@@ -95,6 +110,10 @@ class Advisor(db.Model):
             "is_subscribed": self.is_subscribed(),
             "is_admin": self.is_admin(),
             "briefing_email_enabled": self.briefing_email_enabled,
+            "filing_alert_email_enabled": self.filing_alert_email_enabled,
+            "price_alert_email_enabled": self.price_alert_email_enabled,
+            "slack_webhook_url": self.slack_webhook_url,
+            "briefing_focus": self.briefing_focus,
             "created_at": self.created_at.isoformat(),
         }
 
@@ -107,6 +126,8 @@ class Holding(db.Model):
     ticker = db.Column(db.String(20), nullable=False)
     position_size = db.Column(db.Numeric(15, 2), nullable=False)
     shares = db.Column(db.Numeric(15, 6), nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    client_tag = db.Column(db.String(100), nullable=True)
     added_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def to_dict(self):
@@ -116,6 +137,8 @@ class Holding(db.Model):
             "ticker": self.ticker.upper(),
             "position_size": float(self.position_size),
             "shares": float(self.shares) if self.shares is not None else None,
+            "notes": self.notes,
+            "client_tag": self.client_tag,
             "added_at": self.added_at.isoformat(),
         }
 
@@ -187,6 +210,24 @@ class ClientEmail(db.Model):
         }
 
 
+class PortfolioSnapshot(db.Model):
+    __tablename__ = "portfolio_snapshots"
+
+    id = db.Column(db.Integer, primary_key=True)
+    advisor_id = db.Column(db.Integer, db.ForeignKey("advisors.id"), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    total_value = db.Column(db.Numeric(15, 2), nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (db.UniqueConstraint("advisor_id", "date", name="uq_snapshot_advisor_date"),)
+
+    def to_dict(self):
+        return {
+            "date": self.date.isoformat(),
+            "total_value": float(self.total_value),
+        }
+
+
 class PriceAlert(db.Model):
     __tablename__ = "price_alerts"
 
@@ -213,4 +254,25 @@ class PriceAlert(db.Model):
             "triggered_price": float(self.triggered_price) if self.triggered_price else None,
             "read": self.read,
             "created_at": self.created_at.isoformat(),
+        }
+
+
+class ClientContact(db.Model):
+    __tablename__ = "client_contacts"
+
+    id = db.Column(db.Integer, primary_key=True)
+    advisor_id = db.Column(db.Integer, db.ForeignKey("advisors.id"), nullable=False)
+    name = db.Column(db.String(200), nullable=False)
+    email = db.Column(db.String(200), nullable=False)
+    client_tag = db.Column(db.String(100), nullable=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "advisor_id": self.advisor_id,
+            "name": self.name,
+            "email": self.email,
+            "client_tag": self.client_tag or None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
         }
