@@ -26,6 +26,7 @@ class Advisor(db.Model):
     trial_ends_at = db.Column(db.DateTime, nullable=True)
     briefing_email_enabled = db.Column(db.Boolean, nullable=False, default=True, server_default='true')
     api_key = db.Column(db.String(64), nullable=True, unique=True, index=True)
+    unsubscribe_token = db.Column(db.String(64), nullable=True, unique=True, index=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def set_password(self, password):
@@ -53,6 +54,11 @@ class Advisor(db.Model):
         if not self.api_key:
             self.api_key = uuid.uuid4().hex
         return self.api_key
+
+    def ensure_unsubscribe_token(self):
+        if not self.unsubscribe_token:
+            self.unsubscribe_token = uuid.uuid4().hex
+        return self.unsubscribe_token
 
     def is_legacy(self):
         return self.email_verified is None

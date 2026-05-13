@@ -11,11 +11,13 @@ def run_morning_jobs(flask_app):
     Generate morning briefings and scan SEC filings for every advisor with holdings.
     Runs at 7:30am ET on weekdays, giving advisors their briefing before market open at 9:30am.
     """
+    import os
     from models import db, Advisor, Holding, Briefing
     from intelligence.briefing import generate_and_save_briefing
     from intelligence.filing_analyzer import scan_and_analyze_filings
 
     with flask_app.app_context():
+        app_url = os.getenv("APP_URL", "http://localhost:3000")
         advisors = Advisor.query.all()
         logger.info(f"Morning job starting — {len(advisors)} advisor(s) to process")
 
@@ -44,11 +46,15 @@ def run_morning_jobs(flask_app):
             # Email delivery
             if briefing_dict and advisor.briefing_email_enabled:
                 try:
+                    advisor.ensure_unsubscribe_token()
+                    db.session.commit()
                     sent = send_briefing_email(
                         advisor_email=advisor.email,
                         advisor_name=advisor.name,
                         firm_name=advisor.firm_name,
                         briefing_content=briefing_dict["content"],
+                        unsubscribe_token=advisor.unsubscribe_token,
+                        app_url=app_url,
                     )
                     if sent:
                         row = db.session.get(Briefing, briefing_dict["id"])

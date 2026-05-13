@@ -52,7 +52,7 @@ def create_app():
     _PUBLIC_ENDPOINTS = {
         'health', 'create_advisor', 'get_advisor_by_email',
         'verify_email', 'resend_verification', 'forgot_password',
-        'reset_password', 'stripe_webhook', 'demo_generate',
+        'reset_password', 'unsubscribe', 'stripe_webhook', 'demo_generate',
         'get_market_indices', 'contact', 'static',
     }
 
@@ -86,13 +86,19 @@ def create_app():
             db.session.execute(db.text(
                 "ALTER TABLE advisors ADD COLUMN IF NOT EXISTS api_key VARCHAR(64)"
             ))
+            db.session.execute(db.text(
+                "ALTER TABLE advisors ADD COLUMN IF NOT EXISTS unsubscribe_token VARCHAR(64)"
+            ))
             db.session.commit()
         except Exception:
             db.session.rollback()
-        # Create unique index on api_key if it doesn't exist
+        # Unique indexes
         try:
             db.session.execute(db.text(
                 "CREATE UNIQUE INDEX IF NOT EXISTS ix_advisors_api_key ON advisors (api_key)"
+            ))
+            db.session.execute(db.text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_advisors_unsubscribe_token ON advisors (unsubscribe_token)"
             ))
             db.session.commit()
         except Exception:
@@ -248,6 +254,15 @@ def create_app():
             except Exception as exc:
                 logging.error("Contact email failed: %s", exc)
         return jsonify({"message": "Message received"})
+
+    @app.route("/api/unsubscribe/<token>", methods=["GET", "POST"])
+    def unsubscribe(token):
+        advisor = Advisor.query.filter_by(unsubscribe_token=token).first()
+        if not advisor:
+            return jsonify({"error": "Invalid unsubscribe link"}), 404
+        advisor.briefing_email_enabled = False
+        db.session.commit()
+        return jsonify({"message": "Unsubscribed successfully", "name": advisor.name})
 
     def _require_subscription(advisor):
         """Return a 402 error response if advisor has no active subscription, else None."""
@@ -683,10 +698,13 @@ def create_app():
         webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
         payload = request.get_data()
         sig = request.headers.get("Stripe-Signature")
-        try:
-            event = stripe.Webhook.construct_event(payload, sig, webhook_secret)
-        except Exception as e:
-            logging.warning(f"Webhook signature verification failed ({e}), parsing payload directly")
+        if webhook_secret:
+            try:
+                event = stripe.Webhook.construct_event(payload, sig, webhook_secret)
+            except Exception as e:
+                logging.warning(f"Stripe webhook signature rejected: {e}")
+                return jsonify({"error": "Invalid signature"}), 400
+        else:
             import json
             try:
                 event = json.loads(payload)
