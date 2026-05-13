@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, clearAdvisorId, getAdvisorId } from '../api'
+import { useToast } from '../components/Toast'
 
-const TAB = { PROFILE: 'profile', SUBSCRIPTION: 'subscription', SECURITY: 'security' }
+const TAB = { PROFILE: 'profile', SUBSCRIPTION: 'subscription', SECURITY: 'security', NOTIFICATIONS: 'notifications' }
 
 function Section({ title, children }) {
   return (
@@ -53,11 +54,18 @@ export default function Settings() {
   const [portalLoading, setPortalLoading] = useState(false)
   const [checkoutLoading, setCheckoutLoading] = useState(false)
 
+  // Notification preferences
+  const [briefingEmail, setBriefingEmail] = useState(true)
+  const [notifSaving, setNotifSaving] = useState(false)
+
+  const toast = useToast()
+
   useEffect(() => {
     api.getAdvisor().then(a => {
       setAdvisor(a)
       setName(a.name)
       setFirm(a.firm_name)
+      setBriefingEmail(a.briefing_email_enabled !== false)
       setLoading(false)
     }).catch(() => navigate('/'))
   }, [])
@@ -98,7 +106,7 @@ export default function Settings() {
       const { url } = await api.createPortal(getAdvisorId())
       window.location.href = url
     } catch (err) {
-      alert(err.message)
+      toast.error(err.message)
     } finally {
       setPortalLoading(false)
     }
@@ -110,7 +118,7 @@ export default function Settings() {
       const { url } = await api.createCheckout(getAdvisorId())
       window.location.href = url
     } catch (err) {
-      alert(err.message)
+      toast.error(err.message)
     } finally {
       setCheckoutLoading(false)
     }
@@ -124,8 +132,21 @@ export default function Settings() {
       clearAdvisorId()
       window.location.href = '/'
     } catch (err) {
-      alert(err.message)
+      toast.error(err.message)
       setDeleting(false)
+    }
+  }
+
+  async function saveNotifications() {
+    setNotifSaving(true)
+    try {
+      const updated = await api.updateEmailPreferences({ briefing_email_enabled: briefingEmail })
+      setAdvisor(updated)
+      toast.success('Notification preferences saved.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setNotifSaving(false)
     }
   }
 
@@ -173,6 +194,7 @@ export default function Settings() {
           { key: TAB.PROFILE, label: 'Profile' },
           { key: TAB.SUBSCRIPTION, label: 'Subscription' },
           { key: TAB.SECURITY, label: 'Security' },
+          { key: TAB.NOTIFICATIONS, label: 'Notifications' },
         ].map(t => (
           <button
             key={t.key}
@@ -345,6 +367,47 @@ export default function Settings() {
                 </div>
               ))}
             </Section>
+          </div>
+        </div>
+      )}
+
+      {/* ── NOTIFICATIONS TAB ── */}
+      {tab === TAB.NOTIFICATIONS && (
+        <div className="card card-glow" style={{ padding: '8px 28px 28px' }}>
+          <Section title="Email Delivery">
+            <FieldRow
+              label="Daily Morning Briefing"
+              hint="Receive your AI-generated morning intelligence briefing by email at 7:30am ET on weekdays. You can still generate briefings on-demand in the app."
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingTop: 6 }}>
+                <button
+                  type="button"
+                  onClick={() => setBriefingEmail(v => !v)}
+                  style={{
+                    width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
+                    background: briefingEmail ? 'var(--accent)' : 'var(--border)',
+                    position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+                    boxShadow: briefingEmail ? '0 0 8px rgba(79,124,246,0.5)' : 'none',
+                  }}
+                >
+                  <div style={{
+                    position: 'absolute', top: 3, left: briefingEmail ? 23 : 3,
+                    width: 18, height: 18, borderRadius: '50%',
+                    background: '#fff', transition: 'left 0.2s',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+                  }} />
+                </button>
+                <span style={{ fontSize: 13, color: briefingEmail ? 'var(--text)' : 'var(--text-2)', fontWeight: 600 }}>
+                  {briefingEmail ? 'Enabled' : 'Disabled'}
+                </span>
+              </div>
+            </FieldRow>
+          </Section>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+            <button className="btn btn-primary" onClick={saveNotifications} disabled={notifSaving}>
+              {notifSaving ? <><div className="spin spin-sm" />Saving...</> : 'Save Preferences'}
+            </button>
           </div>
         </div>
       )}

@@ -72,6 +72,11 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
   }),
+  updateEmailPreferences: (prefs) => req(`/advisors/${id()}/email-preferences`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(prefs),
+  }),
   updateProfile: (name, firm_name) => req(`/advisors/${id()}/profile`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },

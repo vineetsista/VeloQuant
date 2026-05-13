@@ -4,6 +4,8 @@ logging.basicConfig(level=logging.INFO)
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from flask_migrate import Migrate
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
 from models import db, Advisor, Holding, Briefing, FilingAlert, ClientEmail
 from data.edgar import get_recent_filings, get_cik
@@ -12,7 +14,10 @@ from intelligence.briefing import generate_morning_briefing
 from intelligence.filing_analyzer import scan_and_analyze_filings
 from intelligence.email_generator import generate_client_email
 from scheduler import start_scheduler, run_morning_jobs
-from email_delivery import send_verification_email, send_password_reset_email
+from email_delivery import (
+    send_verification_email, send_password_reset_email,
+    send_welcome_email, send_trial_reminder_email, send_payment_failed_email,
+)
 
 load_dotenv()
 
@@ -32,8 +37,27 @@ def create_app():
     db.init_app(app)
     Migrate(app, db)
 
+    limiter = Limiter(
+        key_func=get_remote_address,
+        app=app,
+        default_limits=[],
+        storage_uri="memory://",
+    )
+
+    @app.errorhandler(429)
+    def ratelimit_handler(e):
+        return jsonify({"error": "Too many requests. Please wait before trying again."}), 429
+
     with app.app_context():
         db.create_all()
+        # Idempotent schema migrations for columns added after initial deploy
+        try:
+            db.session.execute(db.text(
+                "ALTER TABLE advisors ADD COLUMN IF NOT EXISTS briefing_email_enabled BOOLEAN NOT NULL DEFAULT TRUE"
+            ))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
 
     # ── Health ────────────────────────────────────────────────────────────────
 
@@ -48,6 +72,7 @@ def create_app():
     # ── Advisors ──────────────────────────────────────────────────────────────
 
     @app.route("/api/advisors", methods=["POST"])
+    @limiter.limit("10 per hour")
     def create_advisor():
         data = request.get_json()
         if not all(k in data for k in ("name", "firm_name", "email")):
@@ -72,6 +97,7 @@ def create_app():
         return jsonify(advisor.to_dict())
 
     @app.route("/api/advisors/by-email", methods=["POST"])
+    @limiter.limit("20 per hour; 5 per minute")
     def get_advisor_by_email():
         data = request.get_json() or {}
         email = data.get("email", "").strip().lower()
@@ -92,9 +118,13 @@ def create_app():
         advisor = Advisor.query.filter_by(verification_token=token).first()
         if not advisor:
             return jsonify({"error": "Invalid or expired verification link"}), 400
+        first_verify = not advisor.email_verified
         advisor.email_verified = True
         advisor.verification_token = None
         db.session.commit()
+        if first_verify:
+            app_url = os.getenv("APP_URL", "http://localhost:3000")
+            send_welcome_email(advisor.email, advisor.name, advisor.firm_name, app_url)
         return jsonify({"message": "Email verified", "advisor": advisor.to_dict()})
 
     @app.route("/api/resend-verification", methods=["POST"])
@@ -110,6 +140,7 @@ def create_app():
         return jsonify({"message": "If that account exists and is unverified, a new email was sent"})
 
     @app.route("/api/forgot-password", methods=["POST"])
+    @limiter.limit("5 per hour")
     def forgot_password():
         data = request.get_json() or {}
         email = data.get("email", "").strip().lower()
@@ -299,6 +330,15 @@ def create_app():
             advisor.name = data["name"].strip()
         if "firm_name" in data and data["firm_name"].strip():
             advisor.firm_name = data["firm_name"].strip()
+        db.session.commit()
+        return jsonify(advisor.to_dict())
+
+    @app.route("/api/advisors/<int:advisor_id>/email-preferences", methods=["PATCH"])
+    def update_email_preferences(advisor_id):
+        advisor = db.get_or_404(Advisor, advisor_id)
+        data = request.get_json() or {}
+        if "briefing_email_enabled" in data:
+            advisor.briefing_email_enabled = bool(data["briefing_email_enabled"])
         db.session.commit()
         return jsonify(advisor.to_dict())
 
@@ -595,6 +635,8 @@ def create_app():
             if advisor:
                 advisor.subscription_status = "past_due"
                 db.session.commit()
+                app_url = os.getenv("APP_URL", "http://localhost:3000")
+                send_payment_failed_email(advisor.email, advisor.name, app_url)
 
         return jsonify({"received": True})
 

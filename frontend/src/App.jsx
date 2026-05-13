@@ -13,6 +13,9 @@ import SignIn from './pages/SignIn'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import VerifyEmail from './pages/VerifyEmail'
+import PrivacyPolicy from './pages/PrivacyPolicy'
+import TermsOfService from './pages/TermsOfService'
+import Disclaimer from './pages/Disclaimer'
 import MarketBar from './components/MarketBar'
 import { getAdvisorId, clearAdvisorId, api } from './api'
 
@@ -28,6 +31,7 @@ const NAV = [
 function AppLayout() {
   const location = useLocation()
   const [advisor, setAdvisor] = useState(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
     if (getAdvisorId()) {
@@ -63,6 +67,15 @@ function AppLayout() {
   if (location.pathname === '/reset-password') {
     return <Routes><Route path="/reset-password" element={<ResetPassword />} /></Routes>
   }
+  if (location.pathname === '/privacy') {
+    return <Routes><Route path="/privacy" element={<PrivacyPolicy />} /></Routes>
+  }
+  if (location.pathname === '/terms') {
+    return <Routes><Route path="/terms" element={<TermsOfService />} /></Routes>
+  }
+  if (location.pathname === '/disclaimer') {
+    return <Routes><Route path="/disclaimer" element={<Disclaimer />} /></Routes>
+  }
 
   // Landing page for logged-out visitors
   if (!getAdvisorId()) {
@@ -76,7 +89,12 @@ function AppLayout() {
   // Full app for logged-in advisors
   return (
     <div className="layout">
-      <aside className="sidebar">
+      {/* Mobile overlay — closes sidebar when tapping outside */}
+      {sidebarOpen && (
+        <div className="mobile-overlay" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      <aside className={`sidebar${sidebarOpen ? ' mobile-open' : ''}`}>
         <div className="sidebar-brand">
           <div className="brand-logo">◆</div>
           <div className="brand-text">
@@ -94,6 +112,7 @@ function AppLayout() {
                 to={to}
                 end={end}
                 className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}
+                onClick={() => setSidebarOpen(false)}
               >
                 <span className="nav-icon">{icon}</span>
                 {label}
@@ -208,7 +227,7 @@ function AppLayout() {
       </aside>
 
       <main className="main-content" style={{ padding: 0, display: 'flex', flexDirection: 'column' }}>
-        <MarketBar />
+        <MarketBar onMenuClick={() => setSidebarOpen(v => !v)} />
         <div style={{ padding: '24px 28px', flex: 1 }}>
           <Routes>
             <Route path="/"              element={<Dashboard />} />

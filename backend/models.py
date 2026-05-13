@@ -23,6 +23,7 @@ class Advisor(db.Model):
     stripe_subscription_id = db.Column(db.String(100), nullable=True)
     subscription_status = db.Column(db.String(50), nullable=True)  # trialing, active, past_due, canceled, unpaid
     trial_ends_at = db.Column(db.DateTime, nullable=True)
+    briefing_email_enabled = db.Column(db.Boolean, nullable=False, default=True, server_default='true')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def set_password(self, password):
@@ -79,6 +80,7 @@ class Advisor(db.Model):
             "trial_days_remaining": self.trial_days_remaining(),
             "is_subscribed": self.is_subscribed(),
             "is_admin": self.is_admin(),
+            "briefing_email_enabled": self.briefing_email_enabled,
             "created_at": self.created_at.isoformat(),
         }
 

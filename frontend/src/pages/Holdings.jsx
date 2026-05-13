@@ -34,6 +34,8 @@ export default function Holdings() {
   const [size,       setSize]       = useState('')
   const [loading,    setLoading]    = useState(true)
   const [adding,     setAdding]     = useState(false)
+  const [importing,  setImporting]  = useState(false)
+  const [importMsg,  setImportMsg]  = useState(null)
   const [error,      setError]      = useState(null)
   const [sortBy,     setSortBy]     = useState('size')
 
@@ -73,6 +75,40 @@ export default function Holdings() {
       await api.deleteHolding(id)
       setHoldings(prev => prev.filter(h => h.id !== id))
     } catch (e) { setError(e.message) }
+  }
+
+  async function handleCSVImport(e) {
+    const file = e.target.files[0]
+    if (!file) return
+    e.target.value = ''
+    setImporting(true); setImportMsg(null); setError(null)
+
+    const text = await file.text()
+    const lines = text.trim().split('\n').filter(l => l.trim())
+    // Skip header row if first cell looks like a label
+    const start = /^ticker|^symbol|^stock/i.test(lines[0]) ? 1 : 0
+    const rows = lines.slice(start).map(l => l.split(',').map(c => c.trim().replace(/^"|"$/g, '')))
+
+    let added = 0, skipped = 0, errors = 0
+    for (const cols of rows) {
+      const t = cols[0]?.toUpperCase()
+      const s = parseFloat(cols[1])
+      if (!t || isNaN(s) || s <= 0) { skipped++; continue }
+      try {
+        const h = await api.addHolding(t, s)
+        setHoldings(prev => {
+          const ex = prev.find(x => x.ticker === h.ticker)
+          return ex ? prev.map(x => x.ticker === h.ticker ? h : x) : [...prev, h]
+        })
+        added++
+      } catch (_) { errors++ }
+    }
+
+    setImportMsg(`Imported ${added} position${added !== 1 ? 's' : ''}${skipped > 0 ? `, ${skipped} skipped` : ''}${errors > 0 ? `, ${errors} failed` : ''}.`)
+    setImporting(false)
+    if (added > 0) {
+      try { setMarketData(await api.getMarketData()) } catch (_) {}
+    }
   }
 
   if (loading) return <div className="loading"><div className="spin" /><span>Loading holdings...</span></div>
@@ -179,9 +215,31 @@ export default function Holdings() {
       <div className={holdings.length > 0 ? 'grid-2' : undefined} style={{ marginBottom: 20 }}>
         {/* Add form */}
         <div className="card card-glow">
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 18, letterSpacing: '-0.01em' }}>
-            Add Position
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' }}>
+              Add Position
+            </div>
+            <label style={{
+              fontSize: 12, fontWeight: 600, color: 'var(--text-2)', cursor: 'pointer',
+              padding: '5px 12px', borderRadius: 8, border: '1px solid var(--border)',
+              background: 'transparent', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 6,
+              opacity: importing ? 0.6 : 1,
+            }}>
+              {importing ? <><div className="spin spin-sm" />Importing...</> : '⬆ Import CSV'}
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                style={{ display: 'none' }}
+                onChange={handleCSVImport}
+                disabled={importing}
+              />
+            </label>
           </div>
+          {importMsg && (
+            <div style={{ fontSize: 12, color: 'var(--success)', marginBottom: 14, background: 'rgba(16,185,129,0.08)', padding: '8px 12px', borderRadius: 8 }}>
+              {importMsg}
+            </div>
+          )}
           <form onSubmit={handleAdd} className="form-row" style={{ flexWrap: 'wrap' }}>
             <div className="form-group">
               <label className="form-label">Ticker</label>

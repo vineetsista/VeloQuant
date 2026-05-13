@@ -44,7 +44,7 @@ const STATUS_CONFIG = {
 
 const TICKERS = ['SPY', 'QQQ', 'DIA', 'IWM', 'TLT', 'GLD', 'VIX']
 
-export default function MarketBar() {
+export default function MarketBar({ onMenuClick }) {
   const cached  = loadCache()
   const [data,   setData]   = useState(cached?.data || {})
   const [status, setStatus] = useState(getMarketStatus())
@@ -113,6 +113,18 @@ export default function MarketBar() {
       scrollbarWidth: 'none',
       minHeight: 44,
     }}>
+      {/* Hamburger — mobile only */}
+      {onMenuClick && (
+        <button
+          className="mobile-menu-btn"
+          onClick={onMenuClick}
+          aria-label="Toggle navigation"
+          style={{ marginLeft: 10 }}
+        >
+          ☰
+        </button>
+      )}
+
       {/* Market status badge */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 6,

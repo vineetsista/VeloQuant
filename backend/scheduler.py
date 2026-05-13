@@ -1,7 +1,7 @@
 import logging
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-from email_delivery import send_briefing_email
+from email_delivery import send_briefing_email, send_trial_reminder_email
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ def run_morning_jobs(flask_app):
                 logger.error(f"Briefing generation failed for advisor {advisor.id}: {e}")
 
             # Email delivery
-            if briefing_dict:
+            if briefing_dict and advisor.briefing_email_enabled:
                 try:
                     sent = send_briefing_email(
                         advisor_email=advisor.email,
@@ -60,6 +60,35 @@ def run_morning_jobs(flask_app):
                     logger.error(f"Email delivery failed for advisor {advisor.id}: {e}")
 
         logger.info("Morning job finished")
+
+
+def run_trial_reminders(flask_app):
+    """Send reminder emails to advisors whose trials expire in 3 days or 1 day."""
+    import os
+    from models import db, Advisor
+    from datetime import datetime, timezone, timedelta
+
+    with flask_app.app_context():
+        app_url = os.getenv("APP_URL", "http://localhost:3000")
+        now = datetime.now(timezone.utc)
+        advisors = Advisor.query.filter_by(subscription_status="trialing").all()
+
+        for advisor in advisors:
+            if not advisor.trial_ends_at:
+                continue
+            trial_end = advisor.trial_ends_at.replace(tzinfo=timezone.utc)
+            delta = trial_end - now
+            days = delta.days
+
+            if days in (3, 1):
+                try:
+                    sent = send_trial_reminder_email(
+                        advisor.email, advisor.name, days, app_url
+                    )
+                    if sent:
+                        logger.info(f"Trial reminder ({days}d) sent to {advisor.email}")
+                except Exception as e:
+                    logger.error(f"Trial reminder failed for {advisor.email}: {e}")
 
 
 def start_scheduler(flask_app):
@@ -81,9 +110,23 @@ def start_scheduler(flask_app):
         id="morning_briefing",
         name="Morning Briefing Generator",
         replace_existing=True,
-        misfire_grace_time=3600,  # if server was down at 7:30, run within 1 hour
+        misfire_grace_time=3600,
+    )
+
+    scheduler.add_job(
+        func=run_trial_reminders,
+        args=[flask_app],
+        trigger=CronTrigger(
+            hour=6,
+            minute=0,
+            timezone="US/Eastern",
+        ),
+        id="trial_reminders",
+        name="Trial Expiry Reminders",
+        replace_existing=True,
+        misfire_grace_time=3600,
     )
 
     scheduler.start()
-    logger.info("Scheduler started — morning briefings scheduled for 7:30am ET on weekdays")
+    logger.info("Scheduler started — morning briefings at 7:30am ET, trial reminders at 6:00am ET")
     return scheduler

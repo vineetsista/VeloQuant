@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import BriefingRenderer from '../components/BriefingRenderer'
+import { useToast } from '../components/Toast'
 
 const CHART_COLORS = ['#4f7cf6','#06b6d4','#10d97b','#f59e0b','#8b5cf6','#ec4899','#f97316','#ef4444']
 
@@ -58,6 +59,7 @@ function BriefingActions({ briefing }) {
   const [copied, setCopied] = useState(false)
   const [emailing, setEmailing] = useState(false)
   const [emailSent, setEmailSent] = useState(briefing?.delivered || false)
+  const toast = useToast()
 
   function copyToClipboard() {
     navigator.clipboard.writeText(briefing.content).then(() => {
@@ -71,8 +73,9 @@ function BriefingActions({ briefing }) {
     try {
       await api.sendBriefing(briefing.id)
       setEmailSent(true)
+      toast.success('Briefing emailed successfully.')
     } catch (e) {
-      alert(e.message)
+      toast.error(e.message)
     } finally {
       setEmailing(false)
     }

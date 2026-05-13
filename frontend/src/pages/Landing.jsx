@@ -423,11 +423,21 @@ export default function Landing() {
           <span style={{ fontSize: 13, fontWeight: 700 }}>RIA Intelligence</span>
           <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 8 }}>© 2026</span>
         </div>
-        <div style={{ display: 'flex', gap: 24 }}>
-          {['Privacy Policy', 'Terms of Service'].map(l => (
-            <span key={l} style={{ fontSize: 13, color: 'var(--text-2)', cursor: 'pointer' }}>{l}</span>
+        <div style={{ display: 'flex', gap: 24, alignItems: 'center', flexWrap: 'wrap' }}>
+          {[
+            { label: 'Privacy Policy', path: '/privacy' },
+            { label: 'Terms of Service', path: '/terms' },
+            { label: 'Disclaimer', path: '/disclaimer' },
+          ].map(({ label, path }) => (
+            <button
+              key={path}
+              onClick={() => navigate(path)}
+              style={{ background: 'none', border: 'none', fontSize: 13, color: 'var(--text-2)', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
+            >
+              {label}
+            </button>
           ))}
-          <span style={{ fontSize: 12, color: 'var(--text-2)' }}>Not investment advice.</span>
+          <span style={{ fontSize: 12, color: 'var(--text-2)', opacity: 0.6 }}>Not investment advice.</span>
         </div>
       </footer>
 
