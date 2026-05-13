@@ -553,8 +553,9 @@ def create_app():
         sig = request.headers.get("Stripe-Signature")
         try:
             event = stripe.Webhook.construct_event(payload, sig, webhook_secret)
-        except Exception:
-            return jsonify({"error": "Invalid signature"}), 400
+        except Exception as e:
+            logging.error(f"Webhook signature error: {e}")
+            return jsonify({"error": str(e)}), 400
 
         obj = event["data"]["object"]
 
