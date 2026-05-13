@@ -1,0 +1,11 @@
+flask==3.0.3
+flask-sqlalchemy==3.1.1
+flask-migrate==4.0.7
+flask-cors==4.0.1
+psycopg2-binary==2.9.9
+python-dotenv==1.0.1
+anthropic>=0.50.0
+requests==2.32.3
+apscheduler==3.10.4
+sendgrid==6.11.0
+gunicorn==22.0.0
