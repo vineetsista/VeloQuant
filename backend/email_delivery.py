@@ -510,7 +510,7 @@ def send_trial_reminder_email(to_email: str, name: str, days_remaining: int, app
         {'⚠ Last chance' if days_remaining <= 1 else 'Trial ending soon'}
       </div>
       <div style="font-size:14px;color:#334155;line-height:1.6;">
-        Subscribe now for $299/month and keep your morning intelligence briefings going without interruption.
+        Subscribe now for $99/month and keep your morning intelligence briefings going without interruption.
       </div>
     </div>
     <div style="text-align:center;margin-bottom:28px;">
