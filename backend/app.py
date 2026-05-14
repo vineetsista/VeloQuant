@@ -1531,6 +1531,14 @@ def create_app():
             target.email_verified = True  # revoke legacy
         else:
             target.email_verified = None  # grant legacy
+            # Cancel the Stripe subscription so the card is never charged
+            if target.stripe_subscription_id:
+                try:
+                    import stripe
+                    stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+                    stripe.Subscription.cancel(target.stripe_subscription_id)
+                except Exception as e:
+                    logging.warning(f"Could not cancel Stripe sub for legacy user {target_id}: {e}")
             target.subscription_status = None
             target.stripe_subscription_id = None
         db.session.commit()
