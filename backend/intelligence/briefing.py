@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import anthropic
 
 from data.polygon import get_portfolio_market_data, get_upcoming_earnings
-from data.edgar import get_new_filings_for_portfolio
+from data.edgar import get_new_filings_for_portfolio, get_insider_transactions
 
 _client = None
 
@@ -27,7 +27,13 @@ Here is the exact voice and format you produce — study this example and match 
 
 "Three things that matter for your portfolio this morning: First, JPMorgan reported earnings beating estimates by 4% — the key detail for your position is that net interest income guidance came in above consensus, which directly supports the rate-sensitivity thesis you are running on this name. Second, a new 8-K from Johnson & Johnson filed yesterday contains a litigation update buried on page 12 representing a potential $2B liability that has not appeared in this morning's analyst coverage — worth reviewing before client conversations today. Third, the 10-year yield moved +8 basis points overnight on stronger-than-expected jobs data — this matters specifically for your BRK.B position because Berkshire's insurance float generates meaningful fixed income, and the duration profile of that float becomes more valuable as rates reprice higher."
 
-That specificity. That mechanism. That portfolio-awareness. Nothing generic. Nothing that could appear in a mass-market newsletter."""
+That specificity. That mechanism. That portfolio-awareness. Nothing generic. Nothing that could appear in a mass-market newsletter.
+
+ABSOLUTE PROHIBITIONS — violating these destroys advisor trust:
+- NEVER mention analyst upgrades, downgrades, price target changes, or consensus estimates. You do not have access to current analyst data. Your training data contains stale ratings — do not use them.
+- NEVER state that earnings are happening "today" or "tomorrow" based on the estimated dates provided. Earnings dates in this briefing are rough 91-day estimates from the last quarterly filing — they can be off by weeks. If an estimated earnings date is provided, say "estimated to report around [date]" and note it is unconfirmed.
+- NEVER fabricate specific numbers, dates, or events not present in the data provided to you.
+- ONLY discuss insider transactions if they appear in the INSIDER TRANSACTIONS section. Do not invent or recall insider activity from training data."""
 
 
 def _build_user_message(
@@ -37,6 +43,7 @@ def _build_user_message(
     market_data: dict,
     filings: list[dict],
     earnings: dict = None,
+    insiders: dict = None,
     briefing_focus: str = None,
 ) -> str:
     holdings_lines_parts = []
@@ -86,15 +93,36 @@ def _build_user_message(
     if earnings:
         held = {h["ticker"].upper() for h in holdings}
         for ticker, e in earnings.items():
-            if ticker in held and e.get("days_out") is not None and e["days_out"] <= 14:
+            # Only include future estimates (days_out >= 2). days_out <= 1 means the
+            # 91-day estimate has already passed or lands today/tomorrow — too unreliable
+            # to surface. Never say earnings are "today" based on a rough estimate.
+            if ticker in held and e.get("days_out") is not None and 2 <= e["days_out"] <= 14:
                 d = e["days_out"]
-                label = "today (est.)" if d <= 0 else ("tomorrow (est.)" if d == 1 else f"in {d} days (est. {e['next_est']})")
-                earnings_lines.append(f"  - {ticker}: reports earnings {label}")
+                earnings_lines.append(
+                    f"  - {ticker}: estimated earnings around {e['next_est']} (~{d} days) — "
+                    f"UNCONFIRMED estimate based on historical quarterly cadence, not a confirmed date"
+                )
+
+    insider_lines = []
+    if insiders:
+        held = {h["ticker"].upper() for h in holdings}
+        for ticker, txns in insiders.items():
+            if ticker not in held:
+                continue
+            for t in txns[:4]:
+                direction = "BOUGHT" if t["type"] == "buy" else "SOLD"
+                price_str = f" @ ${t['price']:.2f}/share" if t["price"] > 0 else ""
+                value_str = f" (${t['value']:,.0f} total)" if t["value"] > 0 else ""
+                insider_lines.append(
+                    f"  - {ticker}: {t['name']} ({t['title']}) {direction} "
+                    f"{t['shares']:,.0f} shares{price_str}{value_str} on {t['date']}"
+                )
 
     prices_section = "\n".join(price_lines) if price_lines else "  No price data available"
     news_section = "\n".join(news_lines) if news_lines else "  No recent news"
     filings_section = "\n".join(filing_lines) if filing_lines else "  No new SEC filings in this period"
     earnings_section = "\n".join(earnings_lines) if earnings_lines else "  None within 14 days"
+    insider_section = "\n".join(insider_lines) if insider_lines else "  None in the past 14 days"
 
     focus_section = f"\nADVISOR FOCUS FOR TODAY:\n{briefing_focus}\n" if briefing_focus and briefing_focus.strip() else ""
 
@@ -116,8 +144,11 @@ RECENT NEWS (last 48 hours):
 RECENT SEC FILINGS:
 {filings_section}
 
-UPCOMING EARNINGS (within 14 days):
-{earnings_section}{focus_section}
+UPCOMING EARNINGS (within 14 days, UNCONFIRMED ESTIMATES ONLY):
+{earnings_section}
+
+INSIDER TRANSACTIONS (Form 4, last 14 days):
+{insider_section}{focus_section}
 ---
 
 Write 3-5 briefing items. Hard rules:
@@ -125,14 +156,17 @@ Write 3-5 briefing items. Hard rules:
 2. Every item must state the direct implication for THAT position — not the company in general, not the sector, this specific holding
 3. For any macro item (rates, Fed, macro data), you must explicitly name the holding and explain the exact transmission mechanism
 4. For SEC filings, pull specific content from the excerpt above — reference actual numbers, specific sections, or buried details a busy advisor would miss
-5. If live price or news data is unavailable for a holding, write a thesis-driven item: state the current investment thesis for that position, identify the single most important data point or catalyst to monitor this week, and explain exactly why it matters for that holding. This is still high-value signal — never skip a holding just because live data is missing.
-6. Format each item exactly as follows — ticker name, em dash, then a 6-10 word headline that captures the specific signal, then a blank line, then 2-4 sentences of analysis:
+5. If insider transactions are present, include an item discussing the signal — buying by C-suite officers is more meaningful than 10%+ owner transactions; large sells by multiple insiders simultaneously is more significant than a single small sale
+6. If live price or news data is unavailable for a holding, write a thesis-driven item: state the current investment thesis for that position, identify the single most important data point or catalyst to monitor this week, and explain exactly why it matters for that holding. This is still high-value signal — never skip a holding just because live data is missing.
+7. NEVER mention analyst upgrades, downgrades, or price targets — you do not have this data
+8. For any earnings mention, use "estimated to report around [date]" language — these are unconfirmed estimates
+9. Format each item exactly as follows — ticker name, em dash, then a 6-10 word headline that captures the specific signal, then a blank line, then 2-4 sentences of analysis:
 
    1. TICKER — Headline capturing the specific signal here
 
    Analysis paragraph tied directly to the investment thesis for that position.
 
-7. End with exactly this format on its own line: "Overall portfolio tone: [CONSTRUCTIVE / CAUTIOUS / MIXED] — [one sentence naming the specific holdings and reason driving the tone]"
+10. End with exactly this format on its own line: "Overall portfolio tone: [CONSTRUCTIVE / CAUTIOUS / MIXED] — [one sentence naming the specific holdings and reason driving the tone]"
 
 Start your response immediately with "1." — no preamble, no data disclaimers, no sign-off."""
 
@@ -150,10 +184,11 @@ def generate_morning_briefing(
     """
     tickers = [h["ticker"] for h in holdings]
 
-    with ThreadPoolExecutor(max_workers=3) as executor:
-        market_future = executor.submit(get_portfolio_market_data, tickers)
-        filings_future = executor.submit(get_new_filings_for_portfolio, tickers, days_back=days_back_filings)
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        market_future   = executor.submit(get_portfolio_market_data, tickers)
+        filings_future  = executor.submit(get_new_filings_for_portfolio, tickers, days_back=days_back_filings)
         earnings_future = executor.submit(get_upcoming_earnings, tickers)
+        insider_future  = executor.submit(get_insider_transactions, tickers, 14)
         try:
             market_data = market_future.result(timeout=25)
         except Exception:
@@ -166,8 +201,14 @@ def generate_morning_briefing(
             earnings = earnings_future.result(timeout=300)
         except Exception:
             earnings = {}
+        try:
+            insiders = insider_future.result(timeout=60)
+        except Exception:
+            insiders = {}
 
-    user_message = _build_user_message(advisor_name, firm_name, holdings, market_data, filings, earnings, briefing_focus)
+    user_message = _build_user_message(
+        advisor_name, firm_name, holdings, market_data, filings, earnings, insiders, briefing_focus
+    )
 
     response = _get_client().messages.create(
         model="claude-sonnet-4-6",

@@ -1,5 +1,6 @@
 import re
 import time
+import xml.etree.ElementTree as ET
 import requests
 from datetime import datetime, timedelta
 
@@ -106,6 +107,98 @@ def _strip_html(html: str) -> str:
     text = re.sub(r"&#\d+;", " ", text)
     text = re.sub(r"\s{3,}", "\n\n", text)
     return text.strip()
+
+
+def _parse_form4_xml(xml_text: str) -> list[dict]:
+    """Parse a Form 4 XML document and return structured insider transactions."""
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError:
+        return []
+
+    name_el = root.find(".//rptOwnerName")
+    name = name_el.text.strip() if name_el is not None and name_el.text else "Unknown"
+
+    title_el = root.find(".//officerTitle")
+    is_dir = root.find(".//isDirector")
+    is_ten_pct = root.find(".//isTenPercentOwner")
+    if title_el is not None and title_el.text and title_el.text.strip():
+        title = title_el.text.strip()
+    elif is_dir is not None and is_dir.text and is_dir.text.strip() == "1":
+        title = "Director"
+    elif is_ten_pct is not None and is_ten_pct.text and is_ten_pct.text.strip() == "1":
+        title = "10%+ Owner"
+    else:
+        title = "Insider"
+
+    transactions = []
+    for txn in root.findall(".//nonDerivativeTransaction"):
+        date_el  = txn.find(".//transactionDate/value")
+        shares_el = txn.find(".//transactionAmounts/transactionShares/value")
+        price_el  = txn.find(".//transactionAmounts/transactionPricePerShare/value")
+        code_el   = txn.find(".//transactionAmounts/transactionAcquiredDisposedCode/value")
+        if not all([date_el, shares_el, code_el]):
+            continue
+        try:
+            shares = float(shares_el.text)
+            price  = float(price_el.text) if price_el is not None and price_el.text else 0.0
+            code   = (code_el.text or "").strip().upper()
+            date   = (date_el.text or "").strip()[:10]
+            txn_type = "buy" if code == "A" else "sell" if code == "D" else None
+            if not txn_type or shares < 100:
+                continue
+            transactions.append({
+                "name":  name,
+                "title": title,
+                "type":  txn_type,
+                "shares": shares,
+                "price":  price,
+                "date":   date,
+                "value":  round(shares * price),
+            })
+        except (ValueError, TypeError):
+            continue
+
+    return transactions
+
+
+def get_insider_transactions(tickers: list[str], days_back: int = 14) -> dict:
+    """Fetch recent Form 4 insider transactions for portfolio tickers via EDGAR.
+
+    Returns {TICKER: [{"name", "title", "type" (buy/sell), "shares", "price", "date", "value"}]}.
+    Only non-derivative (common stock) transactions >= 100 shares are included.
+    Rate-limited to stay under SEC's 10 req/sec guideline.
+    """
+    result = {}
+
+    for ticker in tickers:
+        try:
+            filings = get_recent_filings(ticker, filing_types=("4",), days_back=days_back)
+        except Exception:
+            time.sleep(0.15)
+            continue
+
+        all_txns = []
+        for filing in filings[:6]:
+            time.sleep(0.15)
+            try:
+                accession_clean = filing["accession_number"].replace("-", "")
+                cik = filing["cik"]
+                url = (f"{SEC_BASE}/Archives/edgar/data/{int(cik)}"
+                       f"/{accession_clean}/{filing['primary_document']}")
+                resp = requests.get(url, headers=HEADERS, timeout=10)
+                if resp.status_code != 200:
+                    continue
+                all_txns.extend(_parse_form4_xml(resp.text))
+            except Exception:
+                continue
+
+        if all_txns:
+            result[ticker.upper()] = all_txns
+
+        time.sleep(0.15)
+
+    return result
 
 
 def get_new_filings_for_portfolio(tickers: list[str], days_back: int = 1) -> list[dict]:
