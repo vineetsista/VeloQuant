@@ -245,7 +245,7 @@ export default function Admin() {
           <SectionLabel>Revenue</SectionLabel>
           <div className="stats-row" style={{ marginBottom: 20 }}>
             <Metric label="Monthly Recurring Revenue" value={`$${stats.mrr.toLocaleString()}`} sub={`$${stats.arr.toLocaleString()} ARR`} color="var(--success)" big />
-            <Metric label="Active Subscribers" value={stats.active} sub="Paying $299 / mo" color="var(--success)" />
+            <Metric label="Active Subscribers" value={stats.active} sub="Paying $99 / mo" color="var(--success)" />
             <Metric label="In Free Trial" value={stats.trialing} sub="14-day trial active" color="var(--accent)" />
             <Metric label="Trial → Paid Rate" value={`${convRate}%`} sub="Of closed trials" color={convRate >= 50 ? 'var(--success)' : 'var(--warning)'} />
           </div>
@@ -493,7 +493,7 @@ export default function Admin() {
           <div className="card" style={{ padding: 28 }}>
             <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-2)', marginBottom: 14 }}>Platform Configuration</div>
             {[
-              ['Subscription Price',   '$299 / month'],
+              ['Subscription Price',   '$99 / month'],
               ['Free Trial Duration',  '14 days'],
               ['Briefing Schedule',    '7:30 AM ET · Daily'],
               ['AI Model',             'Claude Sonnet 4.6 (Anthropic)'],

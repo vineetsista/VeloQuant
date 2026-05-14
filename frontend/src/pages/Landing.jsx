@@ -405,7 +405,7 @@ export default function Landing() {
                   <th style={{ textAlign: 'left', padding: '14px 20px', fontWeight: 600, fontSize: 13, color: 'var(--text-2)', borderBottom: '2px solid var(--border)' }}></th>
                   <th style={{ textAlign: 'center', padding: '14px 20px', borderBottom: '2px solid var(--accent)', background: 'rgba(79,124,246,0.06)' }}>
                     <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--accent)' }}>VeloQuant</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 600, marginTop: 2 }}>$299/mo</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 600, marginTop: 2 }}>$99/mo</div>
                   </th>
                   <th style={{ textAlign: 'center', padding: '14px 20px', borderBottom: '2px solid var(--border)' }}>
                     <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Bloomberg Terminal</div>
@@ -538,7 +538,7 @@ export default function Landing() {
         <h2 style={{ fontSize: 'clamp(24px, 3vw, 38px)', fontWeight: 900, letterSpacing: '-0.03em', marginBottom: 40 }}>Simple, transparent pricing</h2>
         <div className="card card-glow" style={{ padding: '40px 36px', textAlign: 'left' }}>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 6 }}>
-            <span style={{ fontSize: 52, fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1 }}>$299</span>
+            <span style={{ fontSize: 52, fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1 }}>$99</span>
             <span style={{ fontSize: 18, color: 'var(--text-2)', paddingBottom: 6 }}>/month</span>
           </div>
           <div style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 600, marginBottom: 28 }}>14-day free trial · Cancel anytime</div>

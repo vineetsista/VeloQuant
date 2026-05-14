@@ -399,7 +399,7 @@ export default function Settings() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)' }}>
                 <div>
                   <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em', marginBottom: 4 }}>VeloQuant</div>
-                  <div style={{ fontSize: 13, color: 'var(--text-2)' }}>$299 / month · AI morning briefings for independent advisors</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-2)' }}>$99 / month · AI morning briefings for independent advisors</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   {advisor?.is_legacy ? (
