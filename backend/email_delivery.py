@@ -1,9 +1,25 @@
 import os
 import re
+import html as _html_module
 import logging
 from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
+
+
+def _html_to_text(html_body: str) -> str:
+    """Strip HTML tags to produce a plain-text fallback for spam filter compatibility."""
+    text = re.sub(r'<style[^>]*>.*?</style>', '', html_body, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r'<!--.*?-->', '', text, flags=re.DOTALL)
+    text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'</?(tr|p|div|li|h[1-6])[^>]*>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'<td[^>]*>', ' ', text, flags=re.IGNORECASE)
+    text = re.sub(r'<a\s[^>]*href=["\']([^"\']+)["\'][^>]*>([^<]+)</a>', r'\2 (\1)', text, flags=re.IGNORECASE)
+    text = re.sub(r'<[^>]+>', '', text)
+    text = _html_module.unescape(text)
+    text = re.sub(r'[ \t]{2,}', ' ', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
 
 
 def _briefing_to_html(briefing_content: str, advisor_name: str, firm_name: str, unsubscribe_url: str = "") -> str:
@@ -260,7 +276,9 @@ def _briefing_to_html(briefing_content: str, advisor_name: str, firm_name: str, 
 </html>"""
 
 
-def _send_transactional_email(to_email: str, subject: str, html_body: str) -> bool:
+def _send_transactional_email(
+    to_email: str, subject: str, html_body: str, list_unsubscribe: str = ""
+) -> bool:
     api_key = os.getenv("SENDGRID_API_KEY")
     from_email = os.getenv("BRIEFING_FROM_EMAIL")
     if not api_key or not from_email:
@@ -268,14 +286,19 @@ def _send_transactional_email(to_email: str, subject: str, html_body: str) -> bo
         return False
     try:
         import sendgrid
-        from sendgrid.helpers.mail import Mail, Email, To, HtmlContent
+        from sendgrid.helpers.mail import Mail, Email, To, Content, Header
 
+        plain_text = _html_to_text(html_body)
         message = Mail(
             from_email=Email(from_email, "VeloQuant"),
             to_emails=To(to_email),
             subject=subject,
-            html_content=HtmlContent(html_body),
         )
+        message.add_content(Content("text/plain", plain_text))
+        message.add_content(Content("text/html", html_body))
+        if list_unsubscribe:
+            message.add_header(Header("List-Unsubscribe", f"<{list_unsubscribe}>"))
+            message.add_header(Header("List-Unsubscribe-Post", "List-Unsubscribe=One-Click"))
         sg = sendgrid.SendGridAPIClient(api_key=api_key)
         response = sg.send(message)
         return response.status_code in (200, 202)
@@ -384,35 +407,16 @@ def send_briefing_email(
         return False
 
     try:
-        import sendgrid
-        from sendgrid.helpers.mail import Mail, Email, To, Content, HtmlContent
-
         today = datetime.now(timezone.utc).strftime("%A, %B %d").replace(" 0", " ")
         subject = f"Morning Briefing — {today}"
         unsubscribe_url = f"{app_url}/unsubscribe/{unsubscribe_token}" if unsubscribe_token and app_url else ""
         html_body = _briefing_to_html(briefing_content, advisor_name, firm_name, unsubscribe_url)
-
-        message = Mail(
-            from_email=Email(from_email, "VeloQuant"),
-            to_emails=To(advisor_email),
-            subject=subject,
-            html_content=HtmlContent(html_body),
+        result = _send_transactional_email(
+            advisor_email, subject, html_body, list_unsubscribe=unsubscribe_url
         )
-
-        sg = sendgrid.SendGridAPIClient(api_key=api_key)
-        response = sg.send(message)
-
-        if response.status_code in (200, 202):
-            logger.info(
-                f"Briefing email sent to {advisor_email} (status {response.status_code})"
-            )
-            return True
-        else:
-            logger.error(
-                f"SendGrid returned status {response.status_code} for {advisor_email}"
-            )
-            return False
-
+        if result:
+            logger.info(f"Briefing email sent to {advisor_email}")
+        return result
     except Exception as e:
         logger.error(f"Failed to send briefing email to {advisor_email}: {e}")
         return False
@@ -524,7 +528,10 @@ def send_trial_reminder_email(to_email: str, name: str, days_remaining: int, app
 </table>
 </td></tr></table>
 </body></html>"""
-    return _send_transactional_email(to_email, f"Your VeloQuant trial is {urgency}", html)
+    return _send_transactional_email(
+        to_email, f"Your VeloQuant trial is {urgency}", html,
+        list_unsubscribe=f"{app_url}/settings",
+    )
 
 
 def send_filing_alert_digest_email(
@@ -589,7 +596,7 @@ def send_filing_alert_digest_email(
 </td></tr></table>
 </body></html>"""
     subject = f"{count} new SEC filing{'s' if count != 1 else ''} for your portfolio — {today}"
-    return _send_transactional_email(to_email, subject, html)
+    return _send_transactional_email(to_email, subject, html, list_unsubscribe=f"{app_url}/settings")
 
 
 def send_price_alert_email(to_email: str, name: str, triggered: list, app_url: str) -> bool:
@@ -653,7 +660,7 @@ def send_price_alert_email(to_email: str, name: str, triggered: list, app_url: s
 </td></tr></table>
 </body></html>"""
     subject = f"Price alert triggered: {tickers}"
-    return _send_transactional_email(to_email, subject, html)
+    return _send_transactional_email(to_email, subject, html, list_unsubscribe=f"{app_url}/settings")
 
 
 def send_email_change_email(to_email: str, name: str, token: str, app_url: str) -> bool:

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api'
+import usePageTitle from '../hooks/usePageTitle'
 
 const SECTOR_MAP = {
   // Technology
@@ -115,6 +116,7 @@ function Range52W({ data }) {
 }
 
 export default function Holdings() {
+  usePageTitle('Holdings')
   const [holdings,       setHoldings]       = useState([])
   const [marketData,     setMarketData]     = useState({})
   const [earnings,       setEarnings]       = useState({})

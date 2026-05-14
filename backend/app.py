@@ -1010,7 +1010,7 @@ def create_app():
         now = time.time()
         if _indices_cache["data"] and now - _indices_cache["ts"] < 900:
             return jsonify(_indices_cache["data"])
-        indices = ["SPY", "QQQ", "DIA", "IWM", "TLT", "GLD"]
+        indices = ["SPY", "QQQ", "DIA", "IWM", "TLT", "GLD", "VIX"]
         try:
             data = get_prices_batch(indices)
             _indices_cache["data"] = data

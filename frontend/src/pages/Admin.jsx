@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getAdvisorId } from '../api'
+import usePageTitle from '../hooks/usePageTitle'
 
 const STATUS_COLOR = {
   active:   'var(--success)',
@@ -87,6 +88,7 @@ function SignupChart({ data }) {
 }
 
 export default function Admin() {
+  usePageTitle('Admin Console')
   const [tab, setTab]               = useState('overview')
   const [stats, setStats]           = useState(null)
   const [users, setUsers]           = useState([])

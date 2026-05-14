@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '../api'
+import usePageTitle from '../hooks/usePageTitle'
 
 function parseEmail(content) {
   const lines = content.split('\n')
@@ -11,6 +12,7 @@ function parseEmail(content) {
 }
 
 export default function ClientEmails() {
+  usePageTitle('Client Emails')
   const [emails, setEmails] = useState([])
   const [selected, setSelected] = useState(null)
   const [loading, setLoading] = useState(true)

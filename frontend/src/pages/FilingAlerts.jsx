@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
+import usePageTitle from '../hooks/usePageTitle'
 
 const TYPE_COLOR = { '10-K': 'var(--accent)', '10-Q': 'var(--accent-b)', '8-K': 'var(--warning)', 'DEF 14A': 'var(--success)' }
 
 export default function FilingAlerts() {
+  usePageTitle('Filing Alerts')
   const [alerts, setAlerts] = useState([])
   const [loading, setLoading] = useState(true)
   const [scanning, setScanning] = useState(false)
@@ -35,7 +37,11 @@ export default function FilingAlerts() {
       } else {
         setError(`Scan complete — no new filings found in the last ${scanDays} day${scanDays !== 1 ? 's' : ''}.`)
       }
-    } catch (e) { setError(e.message) }
+    } catch (e) {
+      setError(e.code === 'subscription_required'
+        ? 'Your free trial has ended. Subscribe to continue scanning filings.'
+        : e.message)
+    }
     finally { setScanning(false) }
   }
 

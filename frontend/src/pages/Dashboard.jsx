@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import BriefingRenderer from '../components/BriefingRenderer'
 import { useToast } from '../components/Toast'
+import usePageTitle from '../hooks/usePageTitle'
 
 const GENERATING_MESSAGES = [
   'Fetching overnight price movements...',
@@ -227,6 +228,8 @@ function BriefingActions({ briefing }) {
 }
 
 export default function Dashboard() {
+  usePageTitle('Dashboard')
+  const toast = useToast()
   const [advisor, setAdvisor] = useState(null)
   const [briefing, setBriefing] = useState(null)
   const [holdings, setHoldings] = useState([])
@@ -331,7 +334,7 @@ export default function Dashboard() {
         {showVerifyBanner && (
           <div style={{ background: 'linear-gradient(90deg, rgba(79,124,246,0.15), rgba(6,182,212,0.10))', border: '1px solid rgba(79,124,246,0.3)', borderRadius: 10, padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 12 }}>
             <span style={{ fontSize: 13, fontWeight: 600 }}>✉ Check your inbox to verify your email address</span>
-            <button className="btn btn-outline" style={{ fontSize: 12, padding: '6px 14px' }} onClick={() => api.resendVerification(advisor.email).catch(() => {})}>Resend</button>
+            <button className="btn btn-outline" style={{ fontSize: 12, padding: '6px 14px' }} onClick={() => api.resendVerification(advisor.email).then(() => toast.success('Verification email sent')).catch(() => toast.error('Failed to resend — try again'))}>Resend</button>
           </div>
         )}
         <div className="card card-glow" style={{ padding: '40px 48px', maxWidth: 640 }}>
@@ -385,7 +388,7 @@ export default function Dashboard() {
           <button
             className="btn btn-outline"
             style={{ fontSize: 12, padding: '6px 14px', whiteSpace: 'nowrap' }}
-            onClick={() => api.resendVerification(advisor.email).catch(() => {})}
+            onClick={() => api.resendVerification(advisor.email).then(() => toast.success('Verification email sent')).catch(() => toast.error('Failed to resend — try again'))}
           >
             Resend email
           </button>

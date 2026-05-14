@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api'
 import BriefingRenderer from '../components/BriefingRenderer'
+import usePageTitle from '../hooks/usePageTitle'
 
 export default function Briefing() {
+  usePageTitle('Briefings')
   const [briefings, setBriefings] = useState([])
   const [selected, setSelected] = useState(null)
   const [generating, setGenerating] = useState(false)

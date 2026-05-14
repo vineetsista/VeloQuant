@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, clearAdvisorId, getAdvisorId, getApiKey, setApiKey } from '../api'
 import { useToast } from '../components/Toast'
+import usePageTitle from '../hooks/usePageTitle'
 
 const TAB = { PROFILE: 'profile', SUBSCRIPTION: 'subscription', SECURITY: 'security', NOTIFICATIONS: 'notifications', CLIENTS: 'clients' }
 
@@ -27,6 +28,7 @@ function FieldRow({ label, hint, children }) {
 }
 
 export default function Settings() {
+  usePageTitle('Settings')
   const [advisor, setAdvisor] = useState(null)
   const [tab, setTab] = useState(TAB.PROFILE)
   const [loading, setLoading] = useState(true)

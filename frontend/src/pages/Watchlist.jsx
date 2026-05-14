@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api'
+import usePageTitle from '../hooks/usePageTitle'
 
 const TYPE_LABELS = {
   above:   { label: 'Price rises above', unit: '$', prefix: '$' },
@@ -14,6 +15,7 @@ function alertDescription(a) {
 }
 
 export default function Watchlist() {
+  usePageTitle('Watchlist')
   const [alerts, setAlerts] = useState([])
   const [prices, setPrices] = useState({})
   const [loading, setLoading] = useState(true)

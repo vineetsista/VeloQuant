@@ -174,6 +174,7 @@ def generate_morning_briefing(
         max_tokens=2000,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_message}],
+        timeout=120,
     )
 
     return response.content[0].text

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import BriefingRenderer from '../components/BriefingRenderer'
+import usePageTitle from '../hooks/usePageTitle'
 
 const PROGRESS_MESSAGES = [
   'Connecting to market data feeds...',
@@ -70,6 +71,7 @@ const SAMPLE_SECTIONS = [
 ]
 
 export default function Landing() {
+  usePageTitle('Morning Intelligence for Independent Advisors')
   const [openFaq, setOpenFaq] = useState(null)
   const [tickers, setTickers] = useState('')
   const [loading, setLoading] = useState(false)

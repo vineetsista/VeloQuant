@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, setAdvisorId, setApiKey } from '../api'
+import usePageTitle from '../hooks/usePageTitle'
 
 export default function SignIn() {
+  usePageTitle('Sign In')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)

@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, setAdvisorId, setApiKey, getAdvisorId } from '../api'
+import usePageTitle from '../hooks/usePageTitle'
 
 const SUGGESTED = ['AAPL', 'JPM', 'JNJ', 'BRK.B', 'VTI', 'MSFT', 'GOOGL', 'AMZN']
 
 export default function Onboarding() {
+  usePageTitle('Get Started')
   const [step, setStep] = useState(1)
   const [advisorId, setLocalAdvisorId] = useState(null)
 
