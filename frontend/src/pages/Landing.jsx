@@ -278,7 +278,7 @@ export default function Landing() {
             }}>
               <div>
                 <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>This runs automatically every weekday at 7:30am ET.</div>
-                <div style={{ fontSize: 13, color: 'var(--text-2)' }}>14-day free trial. No credit card required. Cancel anytime.</div>
+                <div style={{ fontSize: 13, color: 'var(--text-2)' }}>14-day free trial. Cancel anytime.</div>
               </div>
               <button className="btn btn-primary" onClick={() => navigate('/onboarding')} style={{ padding: '12px 24px', fontSize: 14 }}>
                 Set Up My Account →
@@ -349,7 +349,7 @@ export default function Landing() {
             <span style={{ fontSize: 18, color: 'var(--text-2)', paddingBottom: 6 }}>/month</span>
           </div>
           <div style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 600, marginBottom: 28 }}>
-            14-day free trial · No credit card required · Cancel anytime
+            14-day free trial · Cancel anytime
           </div>
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 24, marginBottom: 28 }}>
             {[
