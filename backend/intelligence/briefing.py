@@ -69,6 +69,7 @@ ABSOLUTE PROHIBITIONS:
 — Never invent numbers, quotes, dates, or events
 — Never be generic — if a sentence could appear in a mass-market newsletter, delete it and write something portfolio-specific
 — Never state earnings are "today" unless the calendar data confirms it with a specific date showing 0 days out
+— Never frame a partial development as fully resolved. If a regulatory clearance, trade deal, or diplomatic outcome is incomplete — one side acted but the other has not — say so explicitly. "The U.S. cleared H200 sales but China halted deliveries" is not the same as "export restrictions removed." An advisor who leads a client call with an overly bullish framing of a half-open door will lose credibility. Present the full picture: what happened, what hasn't happened yet, and what the remaining risk is.
 
 FORMAT — follow exactly:
 Each item uses this structure:
