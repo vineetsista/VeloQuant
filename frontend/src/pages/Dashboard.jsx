@@ -1,8 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import BriefingRenderer from '../components/BriefingRenderer'
 import { useToast } from '../components/Toast'
+
+const GENERATING_MESSAGES = [
+  'Fetching overnight price movements...',
+  'Scanning SEC EDGAR for recent filings...',
+  'Pulling financial news for your holdings...',
+  'Analyzing filing impact on your positions...',
+  'Drafting your personalized briefing...',
+]
 
 const CHART_COLORS = ['#4f7cf6','#06b6d4','#10d97b','#f59e0b','#8b5cf6','#ec4899','#f97316','#ef4444']
 
@@ -228,9 +236,12 @@ export default function Dashboard() {
   const [priceAlerts, setPriceAlerts] = useState([])
   const [snapshots, setSnapshots] = useState([])
   const [generating, setGenerating] = useState(false)
+  const [genMsgIdx, setGenMsgIdx] = useState(0)
+  const [genProgress, setGenProgress] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const navigate = useNavigate()
+  const genTimers = useRef([])
 
   useEffect(() => { load() }, [])
 
@@ -250,11 +261,37 @@ export default function Dashboard() {
     finally { setLoading(false) }
   }
 
+  useEffect(() => {
+    if (!generating) {
+      genTimers.current.forEach(clearInterval)
+      genTimers.current = []
+      setGenMsgIdx(0)
+      setGenProgress(0)
+      return
+    }
+    const t1 = setInterval(() => setGenMsgIdx(i => (i + 1) % GENERATING_MESSAGES.length), 4000)
+    const t2 = setInterval(() => setGenProgress(p => Math.min(p + 1.2, 90)), 600)
+    genTimers.current = [t1, t2]
+    return () => { clearInterval(t1); clearInterval(t2) }
+  }, [generating])
+
   async function handleGenerate() {
-    setGenerating(true); setError(null)
-    try { setBriefing(await api.generateBriefing()) }
-    catch (e) { setError(e.message) }
-    finally { setGenerating(false) }
+    setGenerating(true); setError(null); setGenProgress(0); setGenMsgIdx(0)
+    try {
+      const b = await api.generateBriefing()
+      setGenProgress(100)
+      setBriefing(b)
+      // Refresh snapshots after generating so sparkline updates
+      api.getPortfolioSnapshots(30).then(s => setSnapshots(s)).catch(() => {})
+    } catch (e) {
+      if (e.code === 'subscription_required') {
+        setError('Your free trial has ended. Subscribe to continue generating briefings.')
+      } else {
+        setError(e.message)
+      }
+    } finally {
+      setGenerating(false)
+    }
   }
 
   if (loading) return <div className="loading"><div className="spin" /><span>Loading your dashboard...</span></div>
@@ -393,7 +430,13 @@ export default function Dashboard() {
         <div className="stat-card">
           <div className="stat-label">Portfolio Value</div>
           <div className="stat-value" style={{ fontSize: totalPortfolio >= 1e6 ? 26 : 32 }}>
-            {totalPortfolio > 0 ? `$${(totalPortfolio / 1000).toFixed(0)}K` : holdings.length}
+            {totalPortfolio >= 1e6
+              ? `$${(totalPortfolio / 1e6).toFixed(2)}M`
+              : totalPortfolio >= 1000
+                ? `$${Math.round(totalPortfolio / 1000)}K`
+                : totalPortfolio > 0
+                  ? `$${Math.round(totalPortfolio).toLocaleString()}`
+                  : `${holdings.length} pos`}
           </div>
           <div className="stat-sub" style={{ color: portfolioGainLoss > 0 ? 'var(--success)' : portfolioGainLoss < 0 ? 'var(--danger)' : undefined }}>
             {portfolioGainLoss !== null
@@ -480,9 +523,14 @@ export default function Dashboard() {
           <div className="generating-box">
             <div className="spin" />
             <div className="generating-title">Analyzing your portfolio...</div>
-            <div className="generating-sub">
-              Pulling overnight prices, SEC filings, and news for {holdings.length} holdings.<br />
-              This takes about 30–60 seconds.
+            <div className="generating-sub" style={{ marginBottom: 20 }}>
+              {GENERATING_MESSAGES[genMsgIdx]}
+            </div>
+            <div style={{ background: 'var(--surface-2)', borderRadius: 4, height: 3, overflow: 'hidden', maxWidth: 320, margin: '0 auto' }}>
+              <div style={{ height: '100%', borderRadius: 4, background: 'linear-gradient(90deg, var(--accent), var(--accent-b))', width: `${genProgress}%`, transition: 'width 0.6s ease' }} />
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 10 }}>
+              Analyzing {holdings.length} holding{holdings.length !== 1 ? 's' : ''} · ~30–60 seconds
             </div>
           </div>
         ) : briefing ? (

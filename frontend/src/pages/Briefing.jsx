@@ -35,8 +35,13 @@ export default function Briefing() {
       const b = await api.generateBriefing()
       setBriefings(prev => [b, ...prev])
       setSelected(b)
-    } catch (e) { setError(e.message) }
-    finally { setGenerating(false) }
+    } catch (e) {
+      if (e.code === 'subscription_required') {
+        setError('Your free trial has ended. Subscribe to continue generating briefings.')
+      } else {
+        setError(e.message)
+      }
+    } finally { setGenerating(false) }
   }
 
   async function handleDelete(id) {

@@ -653,7 +653,7 @@ export default function Settings() {
       {/* ── SECURITY TAB ── */}
       {tab === TAB.SECURITY && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div className="card card-glow" style={{ padding: '8px 28px 28px' }}>
+          <div className="card card-glow" style={{ display: 'none' }}>
             <Section title="API Key">
               <FieldRow
                 label="Your API Key"

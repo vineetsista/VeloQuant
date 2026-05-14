@@ -70,8 +70,9 @@ export default function BriefingRenderer({ content }) {
       i = j; continue
     }
 
-    // Portfolio tone line
-    const toneMatch = text.match(/^overall portfolio tone:\s*(constructive|cautious|mixed)\s+[—–-]+\s+(.+)/i)
+    // Portfolio tone line — flexible format
+    const toneMatch = text.match(/^overall portfolio tone:\s*(constructive|cautious|mixed|neutral|positive|negative)[^—–\n]*[—–-]+\s*(.+)/i)
+      || text.match(/^portfolio tone:\s*(constructive|cautious|mixed|neutral|positive|negative)[^—–\n]*[—–-]+\s*(.+)/i)
     if (toneMatch) {
       const level = toneMatch[1].toUpperCase()
       const toneColor =
@@ -120,6 +121,14 @@ export default function BriefingRenderer({ content }) {
       </div>
     )
     i++
+  }
+
+  if (rendered.length === 0) {
+    return (
+      <div style={{ fontSize: 14, color: 'var(--text-2)', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
+        {content}
+      </div>
+    )
   }
 
   return <div>{rendered}</div>

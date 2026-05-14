@@ -455,6 +455,13 @@ def create_app():
         if not all(k in data for k in ("ticker", "position_size")):
             return jsonify({"error": "ticker and position_size are required"}), 400
 
+        try:
+            ps = float(data["position_size"])
+            if ps <= 0:
+                return jsonify({"error": "Position size must be greater than zero"}), 400
+        except (TypeError, ValueError):
+            return jsonify({"error": "position_size must be a valid number"}), 400
+
         ticker = data["ticker"].upper().strip()
 
         def _set_shares(h):
@@ -995,15 +1002,23 @@ def create_app():
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+    _indices_cache: dict = {"data": None, "ts": 0.0}
+
     @app.route("/api/market/indices")
     def get_market_indices():
-        # Prices only — no news — and cached for 15 min so repeated page
-        # loads don't blast the Polygon rate limit.
-        indices = ["SPY", "QQQ", "DIA", "IWM", "TLT", "GLD", "VIX"]
+        import time
+        now = time.time()
+        if _indices_cache["data"] and now - _indices_cache["ts"] < 900:
+            return jsonify(_indices_cache["data"])
+        indices = ["SPY", "QQQ", "DIA", "IWM", "TLT", "GLD"]
         try:
             data = get_prices_batch(indices)
+            _indices_cache["data"] = data
+            _indices_cache["ts"] = now
             return jsonify(data)
         except Exception as e:
+            if _indices_cache["data"]:
+                return jsonify(_indices_cache["data"])
             return jsonify({"error": str(e)}), 500
 
     # ── Briefing Generation ───────────────────────────────────────────────────
@@ -1059,6 +1074,36 @@ def create_app():
         )
         db.session.add(briefing)
         db.session.commit()
+
+        # Save a portfolio snapshot so the 30-day trend sparkline has data
+        try:
+            from datetime import date as _date
+            prices = get_snapshot_batch([h["ticker"] for h in holdings_data])
+            total_snap = 0.0
+            for h in holdings_data:
+                close = prices.get(h["ticker"].upper(), {}).get("close")
+                if h["shares"] and close:
+                    total_snap += h["shares"] * close
+                else:
+                    total_snap += h["position_size"]
+            if total_snap > 0:
+                today = _date.today()
+                existing_snap = PortfolioSnapshot.query.filter_by(
+                    advisor_id=advisor_id, date=today
+                ).first()
+                if existing_snap:
+                    existing_snap.total_value = total_snap
+                else:
+                    db.session.add(
+                        PortfolioSnapshot(
+                            advisor_id=advisor_id,
+                            date=today,
+                            total_value=total_snap,
+                        )
+                    )
+                db.session.commit()
+        except Exception:
+            pass  # Never fail the briefing response due to snapshot errors
 
         return jsonify(briefing.to_dict()), 201
 

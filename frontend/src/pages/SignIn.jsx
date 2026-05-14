@@ -102,8 +102,10 @@ export default function SignIn() {
                   }}
                 >{showPassword ? 'Hide' : 'Show'}</button>
               </div>
-              <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 6 }}>
-                If your account was created before passwords were added, leave this blank.
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
+                <span onClick={() => navigate('/forgot-password')} style={{ fontSize: 12, color: 'var(--accent)', cursor: 'pointer' }}>
+                  Forgot password?
+                </span>
               </div>
             </div>
 
@@ -117,12 +119,7 @@ export default function SignIn() {
             </button>
           </form>
 
-          <div style={{ marginTop: 16, textAlign: 'center' }}>
-            <span onClick={() => navigate('/forgot-password')} style={{ fontSize: 13, color: 'var(--text-2)', cursor: 'pointer' }}>
-              Forgot your password?
-            </span>
-          </div>
-          <div style={{ marginTop: 12, textAlign: 'center', fontSize: 13, color: 'var(--text-2)' }}>
+          <div style={{ marginTop: 16, textAlign: 'center', fontSize: 13, color: 'var(--text-2)' }}>
             Don't have an account?{' '}
             <span onClick={() => navigate('/onboarding')} style={{ color: 'var(--accent)', cursor: 'pointer', fontWeight: 600 }}>
               Start your free trial

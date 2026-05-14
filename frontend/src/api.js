@@ -23,7 +23,14 @@ async function req(path, options = {}) {
   if (key) headers['X-API-Key'] = key
   const res = await fetch(`/api${path}`, { ...options, headers })
   const data = await res.json()
-  if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`)
+  if (!res.ok) {
+    if (res.status === 402) {
+      const err = new Error(data.message || 'Your free trial has ended. Please subscribe to continue.')
+      err.code = 'subscription_required'
+      throw err
+    }
+    throw new Error(data.error || `Request failed: ${res.status}`)
+  }
   return data
 }
 

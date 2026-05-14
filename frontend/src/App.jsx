@@ -258,7 +258,7 @@ function AppLayout() {
               padding: 0,
             }}
           >
-            ← Switch account
+            Sign Out
           </button>
         </div>
       </aside>
