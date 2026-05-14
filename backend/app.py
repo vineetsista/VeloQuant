@@ -47,7 +47,7 @@ load_dotenv()
 
 def create_app():
     static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
-    app = Flask(__name__, static_folder=static_dir, static_url_path="")
+    app = Flask(__name__, static_folder=None)
 
     # Railway provides DATABASE_URL as postgres:// — SQLAlchemy needs postgresql://
     database_url = os.getenv("DATABASE_URL", "postgresql://localhost/ria_intelligence")
