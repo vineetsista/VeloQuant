@@ -375,7 +375,7 @@ export default function Holdings() {
 
   // Upcoming dividends within 45 days
   const upcomingDividends = Object.entries(dividends)
-    .filter(([, d]) => d.days_out != null && d.days_out <= 45)
+    .filter(([, d]) => d.days_out != null && d.days_out >= 0 && d.days_out <= 45)
     .sort((a, b) => a[1].days_out - b[1].days_out)
     .map(([ticker, d]) => ({ ticker, ...d }))
 
