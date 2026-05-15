@@ -243,7 +243,7 @@ export default function Briefing() {
                       >✕</button>
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text-2)', marginBottom: 5 }}>
-                      {new Date(b.generated_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(b.generated_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' })} ET
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text-2)', lineHeight: 1.5, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                       {preview.replace(/^\d+\.\s*/, '')}
@@ -263,7 +263,7 @@ export default function Briefing() {
                     {new Date(selected.generated_at).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--text-2)' }}>
-                    {new Date(selected.generated_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                    {new Date(selected.generated_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' })} ET
                     {selected.delivered && <span style={{ marginLeft: 10, color: 'var(--success)', fontWeight: 600 }}>✓ Emailed</span>}
                   </div>
                 </div>

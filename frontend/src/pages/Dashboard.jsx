@@ -221,7 +221,7 @@ function BriefingActions({ briefing }) {
       </button>
       <span style={{ color: 'var(--border)', fontSize: 12 }}>·</span>
       <span style={{ fontSize: 12, color: 'var(--text-2)' }}>
-        {new Date(briefing.generated_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+        {new Date(briefing.generated_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' })} ET
       </span>
     </div>
   )
@@ -404,7 +404,7 @@ export default function Dashboard() {
               <span>{advisor?.firm_name} · {date}</span>
               {briefingIsToday ? (
                 <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 10, background: portfolioTone ? `${toneColor}18` : 'rgba(16,185,129,0.15)', color: portfolioTone ? toneColor : 'var(--success)', letterSpacing: '0.04em', border: portfolioTone ? `1px solid ${toneColor}30` : 'none' }}>
-                  ◆ {portfolioTone ? portfolioTone.charAt(0).toUpperCase() + portfolioTone.slice(1).toLowerCase() : 'Briefing ready'} · {new Date(briefing.generated_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                  ◆ {portfolioTone ? portfolioTone.charAt(0).toUpperCase() + portfolioTone.slice(1).toLowerCase() : 'Briefing ready'} · {new Date(briefing.generated_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' })} ET
                 </span>
               ) : (
                 <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 10px', borderRadius: 10, background: 'rgba(79,124,246,0.1)', color: 'var(--accent)', letterSpacing: '0.04em' }}>
