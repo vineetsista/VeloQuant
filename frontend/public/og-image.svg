@@ -1,0 +1,55 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#050c18"/>
+      <stop offset="100%" style="stop-color:#0f2040"/>
+    </linearGradient>
+    <linearGradient id="iconbg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2563EB"/>
+      <stop offset="40%" style="stop-color:#1D4ED8"/>
+      <stop offset="100%" style="stop-color:#1E3A8A"/>
+    </linearGradient>
+    <linearGradient id="textgrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ffffff"/>
+      <stop offset="60%" style="stop-color:#93c5fd"/>
+    </linearGradient>
+    <clipPath id="vclip">
+      <path d="M480 195 L520 265 L560 195 L551 195 L520 252 L489 195 Z"/>
+    </clipPath>
+    <clipPath id="outerclip">
+      <rect x="466" y="181" width="108" height="108" rx="23"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Subtle grid -->
+  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(79,124,246,0.06)" stroke-width="1"/>
+  </pattern>
+  <rect width="1200" height="630" fill="url(#grid)"/>
+
+  <!-- Glow -->
+  <ellipse cx="600" cy="280" rx="500" ry="300" fill="rgba(79,124,246,0.05)"/>
+
+  <!-- Icon -->
+  <rect x="466" y="181" width="108" height="108" rx="23" fill="url(#iconbg)"/>
+  <path d="M480 195 L520 265 L560 195 L551 195 L520 252 L489 195 Z" fill="#FFFFFF"/>
+  <g clip-path="url(#outerclip)">
+    <path d="M459 247 L481 247 L487 241 L493 253 L520 213 L527 253 L533 241 L539 247 L561 247" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g clip-path="url(#vclip)">
+    <path d="M459 247 L481 247 L487 241 L493 253 L520 213 L527 253 L533 241 L539 247 L561 247" fill="none" stroke="#1D4ED8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="600" y="340" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="52" font-weight="700" letter-spacing="8" fill="url(#textgrad)">VELOQUANT</text>
+
+  <!-- Tagline -->
+  <text x="600" y="400" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="22" font-weight="400" fill="rgba(148,163,184,0.9)" letter-spacing="1">Morning Intelligence for Independent Advisors</text>
+
+  <!-- Bottom pill -->
+  <rect x="450" y="460" width="300" height="44" rx="22" fill="rgba(37,99,235,0.15)" stroke="rgba(37,99,235,0.3)" stroke-width="1"/>
+  <text x="600" y="488" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="15" font-weight="600" fill="#93c5fd" letter-spacing="2">veloquant.net</text>
+</svg>

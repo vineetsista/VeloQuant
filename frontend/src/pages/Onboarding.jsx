@@ -125,15 +125,7 @@ export default function Onboarding() {
 
         {/* Brand */}
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
-          <div style={{
-            width: 52, height: 52,
-            background: 'linear-gradient(135deg, var(--accent), var(--accent-b))',
-            borderRadius: 14,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 24, color: 'white', fontWeight: 900,
-            margin: '0 auto 16px',
-            boxShadow: '0 0 40px rgba(79,124,246,0.4)',
-          }}>◆</div>
+          <img src="/veloquant-icon.svg" alt="VeloQuant" style={{ width: 52, height: 52, borderRadius: 14, margin: '0 auto 16px', display: 'block', boxShadow: '0 0 40px rgba(79,124,246,0.4)' }} />
           <div style={{
             fontSize: 13, fontWeight: 700,
             letterSpacing: '0.15em', textTransform: 'uppercase',

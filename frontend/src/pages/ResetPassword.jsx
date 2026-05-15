@@ -50,7 +50,7 @@ export default function ResetPassword() {
 
       <div style={{ width: '100%', maxWidth: 440, position: 'relative', zIndex: 1 }}>
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
-          <div style={{ width: 48, height: 48, background: 'linear-gradient(135deg, var(--accent), var(--accent-b))', borderRadius: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, color: 'white', fontWeight: 900, margin: '0 auto 14px', boxShadow: '0 0 40px rgba(79,124,246,0.35)' }}>◆</div>
+          <img src="/veloquant-icon.svg" alt="VeloQuant" style={{ width: 48, height: 48, borderRadius: 13, margin: '0 auto 14px', display: 'block', boxShadow: '0 0 40px rgba(79,124,246,0.35)' }} />
           <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', background: 'linear-gradient(120deg, var(--text) 0%, var(--accent-b) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>VeloQuant</div>
         </div>
 
