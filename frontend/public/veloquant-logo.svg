@@ -1,0 +1,39 @@
+<svg width="680" height="200" viewBox="0 0 680 200" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" style="stop-color:#2563EB"/>
+<stop offset="40%" style="stop-color:#1D4ED8"/>
+<stop offset="100%" style="stop-color:#1E3A8A"/>
+</linearGradient>
+<clipPath id="vclip">
+<path d="M24 24 L56 88 L88 24 L76 24 L56 70 L36 24 Z"/>
+</clipPath>
+<clipPath id="outerclip">
+<rect x="0" y="0" width="112" height="112" rx="24"/>
+</clipPath>
+</defs>
+
+<!-- Icon centered -->
+<g transform="translate(284, 10)">
+<!-- Rounded square -->
+<rect x="0" y="0" width="112" height="112" rx="24" fill="url(#bg)"/>
+
+<!-- V - solid white -->
+<path d="M24 24 L56 88 L88 24 L76 24 L56 70 L36 24 Z" fill="#FFFFFF"/>
+
+<!-- Pulse on blue background - white -->
+<g clip-path="url(#outerclip)">
+<path d="M14 68 L38 68 L44 62 L50 74 L56 52 L62 74 L68 62 L74 68 L98 68" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+
+<!-- Pulse on white V - blue -->
+<g clip-path="url(#vclip)">
+<path d="M14 68 L38 68 L44 62 L50 74 L56 52 L62 74 L68 62 L74 68 L98 68" fill="none" stroke="#1D4ED8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</g>
+
+<!-- Wordmark - tighter spacing, closer to icon -->
+<text x="340" y="155" text-anchor="middle" font-family="DM Sans, Helvetica Neue, sans-serif" font-size="28" font-weight="500" letter-spacing="6">
+<tspan fill="#0F172A">VELO</tspan><tspan fill="#2563EB">QUANT</tspan>
+</text>
+</svg>

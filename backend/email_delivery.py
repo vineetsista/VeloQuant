@@ -207,19 +207,7 @@ def _briefing_to_html(briefing_content: str, advisor_name: str, firm_name: str, 
             <table cellpadding="0" cellspacing="0" border="0" width="100%">
               <tr>
                 <td>
-                  <div style="
-                    display: inline-block; width: 36px; height: 36px;
-                    background: linear-gradient(135deg, #4f7cf6, #06b6d4);
-                    border-radius: 8px; text-align: center; line-height: 36px;
-                    font-size: 18px; color: white; font-weight: 900;
-                    margin-bottom: 16px;
-                  ">◆</div>
-                  <div style="
-                    font-size: 11px; font-weight: 700; letter-spacing: 0.15em;
-                    text-transform: uppercase; color: #94a3b8;
-                    font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
-                    margin-bottom: 6px;
-                  ">VeloQuant</div>
+                  <img src="https://veloquant.net/veloquant-icon.svg" width="36" height="36" alt="VeloQuant" style="display:block;margin-bottom:12px;border-radius:8px;" />
                   <div style="
                     font-size: 22px; font-weight: 800; color: #ffffff;
                     letter-spacing: -0.03em; line-height: 1.2;
@@ -430,8 +418,7 @@ def send_welcome_email(to_email: str, name: str, firm_name: str, app_url: str) -
 <tr><td align="center">
 <table width="560" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
   <tr><td style="background:linear-gradient(135deg,#0f172a,#1e3a5f);padding:32px 36px;">
-    <div style="display:inline-block;width:36px;height:36px;background:linear-gradient(135deg,#4f7cf6,#06b6d4);border-radius:8px;text-align:center;line-height:36px;font-size:18px;color:white;font-weight:900;margin-bottom:16px;">◆</div>
-    <div style="font-size:11px;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:#94a3b8;margin-bottom:6px;">VeloQuant</div>
+    <img src="https://veloquant.net/veloquant-icon.svg" width="36" height="36" alt="VeloQuant" style="display:block;margin-bottom:12px;border-radius:8px;" />
     <div style="font-size:22px;font-weight:800;color:#fff;letter-spacing:-0.03em;margin-bottom:4px;">Welcome aboard, {name}.</div>
     <div style="font-size:13px;color:#94a3b8;">Your 14-day free trial has started</div>
   </td></tr>

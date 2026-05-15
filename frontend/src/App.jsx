@@ -119,7 +119,7 @@ function AppLayout() {
 
       <aside className={`sidebar${sidebarOpen ? ' mobile-open' : ''}`}>
         <div className="sidebar-brand">
-          <div className="brand-logo">◆</div>
+          <img src="/veloquant-icon.svg" alt="VeloQuant" style={{ width: 32, height: 32, borderRadius: 8 }} />
           <div className="brand-text">
             <div className="brand-name">VeloQuant</div>
             <div className="brand-sub">Morning Platform</div>
