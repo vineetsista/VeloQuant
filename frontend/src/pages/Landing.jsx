@@ -254,7 +254,10 @@ export default function Landing() {
           background: 'rgba(5,12,24,0.96)', backdropFilter: 'blur(16px)',
           borderBottom: '1px solid var(--border)',
         }}>
-          <img src="/veloquant-logo.svg" alt="VeloQuant" style={{ height: 38 }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <img src="/veloquant-icon.svg" alt="VeloQuant" style={{ width: 30, height: 30, borderRadius: 8 }} />
+            <span style={{ fontWeight: 800, fontSize: 15, letterSpacing: '-0.02em' }}>VeloQuant</span>
+          </div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             <button onClick={() => navigate('/signin')} style={{ background: 'none', border: 'none', color: 'var(--text-2)', cursor: 'pointer', fontSize: 14, fontFamily: 'inherit', padding: '8px 12px' }}>Sign In</button>
             <button className="btn btn-primary" onClick={() => navigate('/onboarding')} style={{ fontSize: 13, padding: '8px 18px', animation: 'glow-cta 3s ease-in-out infinite' }}>
