@@ -157,7 +157,7 @@ class Briefing(db.Model):
             "id": self.id,
             "advisor_id": self.advisor_id,
             "content": self.content,
-            "generated_at": self.generated_at.isoformat(),
+            "generated_at": self.generated_at.isoformat() + "Z",
             "delivered": self.delivered,
         }
 

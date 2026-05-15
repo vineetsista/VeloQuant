@@ -312,8 +312,9 @@ export default function Dashboard() {
 
   const showVerifyBanner = advisor && advisor.email_verified === false && !advisor.is_legacy
 
-  const todayStr = new Date().toDateString()
-  const briefingIsToday = briefing && new Date(briefing.generated_at).toDateString() === todayStr
+  const toETDateStr = d => new Date(d).toLocaleDateString('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' })
+  const todayStr = toETDateStr(new Date())
+  const briefingIsToday = briefing && toETDateStr(briefing.generated_at) === todayStr
   const triggeredAlerts = priceAlerts.filter(a => !a.active && !a.read)
 
   const portfolioTone = briefing?.content
