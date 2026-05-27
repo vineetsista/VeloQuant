@@ -245,7 +245,7 @@ Read the system prompt yourself: `backend/intelligence/briefing.py`.
 
 > *"Independent advisors are brilliant — but they're losing two hours every morning to research a team of analysts could do in fifteen minutes. The information advantage shouldn't belong only to the white-shoe firms."*
 
-🌐 [veloquant.net](https://veloquant.net) · ✉️ support@veloquant.net
+🌐 [veloquant.net](https://veloquant.net)
 
 ---
 
