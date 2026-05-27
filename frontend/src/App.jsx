@@ -20,11 +20,13 @@ import Contact from './pages/Contact'
 import Unsubscribe from './pages/Unsubscribe'
 import VerifyEmailChange from './pages/VerifyEmailChange'
 import Watchlist from './pages/Watchlist'
+import Ask from './pages/Ask'
 import MarketBar from './components/MarketBar'
 import { getAdvisorId, clearAdvisorId, api } from './api'
 
 const NAV = [
   { to: '/',              end: true,  icon: '⬡', label: 'Dashboard'    },
+  { to: '/ask',           end: false, icon: '✺', label: 'Ask Portfolio' },
   { to: '/holdings',      end: false, icon: '◈', label: 'Holdings'      },
   { to: '/briefing',      end: false, icon: '≋', label: 'Briefings'     },
   { to: '/filing-alerts', end: false, icon: '◎', label: 'Filing Alerts' },
@@ -272,6 +274,7 @@ function AppLayout() {
             <Route path="/briefing"      element={<Briefing />} />
             <Route path="/filing-alerts" element={<FilingAlerts />} />
             <Route path="/watchlist"     element={<Watchlist />} />
+            <Route path="/ask"           element={<Ask />} />
             <Route path="/client-emails" element={<ClientEmails />} />
             <Route path="/settings"      element={<Settings />} />
             <Route path="/admin"         element={<Admin />} />

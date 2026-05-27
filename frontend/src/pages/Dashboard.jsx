@@ -433,14 +433,16 @@ export default function Dashboard() {
       <div className="stats-row">
         <div className="stat-card">
           <div className="stat-label">Portfolio Value</div>
-          <div className="stat-value" style={{ fontSize: totalPortfolio >= 1e6 ? 26 : 32 }}>
-            {totalPortfolio >= 1e6
-              ? `$${(totalPortfolio / 1e6).toFixed(2)}M`
-              : totalPortfolio >= 1000
-                ? `$${Math.round(totalPortfolio / 1000)}K`
-                : totalPortfolio > 0
-                  ? `$${Math.round(totalPortfolio).toLocaleString()}`
-                  : `${holdings.length} pos`}
+          <div className="stat-value" style={{ fontSize: totalPortfolio >= 1e9 ? 28 : 32 }}>
+            {totalPortfolio >= 1e9
+              ? `$${(totalPortfolio / 1e9).toFixed(2)}B`
+              : totalPortfolio >= 1e6
+                ? `$${(totalPortfolio / 1e6).toFixed(2)}M`
+                : totalPortfolio >= 1000
+                  ? `$${Math.round(totalPortfolio / 1000)}K`
+                  : totalPortfolio > 0
+                    ? `$${Math.round(totalPortfolio).toLocaleString()}`
+                    : `${holdings.length} pos`}
           </div>
           <div className="stat-sub" style={{ color: portfolioGainLoss > 0 ? 'var(--success)' : portfolioGainLoss < 0 ? 'var(--danger)' : undefined }}>
             {portfolioGainLoss !== null

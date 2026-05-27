@@ -410,6 +410,105 @@ def send_briefing_email(
         return False
 
 
+def _weekly_wrap_to_html(content: str, advisor_name: str, firm_name: str, unsubscribe_url: str = "") -> str:
+    """Render the Friday wrap as a premium HTML email."""
+    today = datetime.now(timezone.utc).strftime("%A, %B %d, %Y").replace(" 0", " ")
+
+    paragraphs = [p.strip() for p in content.strip().split("\n\n") if p.strip()]
+    blocks_html = []
+    for para in paragraphs:
+        # Section header (all caps short line)
+        if re.match(r'^[A-Z][A-Z\s&:/–-]{4,}$', para) and len(para) < 60 and not re.search(r'\d', para):
+            blocks_html.append(f"""
+            <tr><td style="padding: 26px 0 8px 0;">
+              <div style="font-size: 10px; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase; color: #4f7cf6; font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">{para}</div>
+            </td></tr>""")
+            continue
+        # Bullets — joined paragraphs with • or - prefixes
+        bullet_pat = re.compile(r'^[•\-]\s+')
+        lines = [l.strip() for l in para.split("\n") if l.strip()]
+        if all(bullet_pat.match(l) for l in lines) and len(lines) > 1:
+            li_items = "".join(
+                '<li style="font-size: 14px; line-height: 1.72; color: #334155; margin-bottom: 6px; font-family: -apple-system, \'Helvetica Neue\', Arial, sans-serif;">'
+                + bullet_pat.sub("", l) + "</li>"
+                for l in lines
+            )
+            blocks_html.append(f"""
+            <tr><td style="padding: 4px 0 14px 0;">
+              <ul style="margin: 0; padding-left: 22px;">{li_items}</ul>
+            </td></tr>""")
+            continue
+        # Single-line bullet
+        if bullet_pat.match(para):
+            stripped = bullet_pat.sub("", para)
+            blocks_html.append(f"""
+            <tr><td style="padding: 0 0 10px 0;">
+              <div style="display: flex; gap: 10px;">
+                <span style="color: #4f7cf6;">◆</span>
+                <span style="flex: 1; font-size: 14px; line-height: 1.72; color: #334155; font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;">{stripped}</span>
+              </div>
+            </td></tr>""")
+            continue
+        # Default paragraph
+        blocks_html.append(f"""
+        <tr><td style="padding: 0 0 14px 0;">
+          <p style="margin: 0; font-size: 14px; line-height: 1.72; color: #334155; font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;">{para.replace(chr(10), ' ')}</p>
+        </td></tr>""")
+
+    items_html = "\n".join(blocks_html)
+
+    return f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Friday Wrap — {today}</title></head>
+<body style="margin:0;padding:0;background:#f1f5f9;">
+<table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f1f5f9;">
+  <tr><td align="center" style="padding: 32px 16px;">
+    <table cellpadding="0" cellspacing="0" border="0" width="600" style="max-width:600px;background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.08);overflow:hidden;">
+      <tr><td style="background: linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%); padding: 32px 36px;">
+        <img src="https://veloquant.net/veloquant-icon.svg" width="36" height="36" alt="VeloQuant" style="display:block;margin-bottom:12px;border-radius:8px;" />
+        <div style="font-size:13px;color:#94a3b8;letter-spacing:0.18em;text-transform:uppercase;font-weight:700;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;margin-bottom:6px;">Friday Executive Wrap</div>
+        <div style="font-size:22px;font-weight:800;color:#fff;letter-spacing:-0.03em;line-height:1.2;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;margin-bottom:4px;">The Week in Your Book</div>
+        <div style="font-size:13px;color:#94a3b8;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;">{today} &nbsp;·&nbsp; Prepared for {advisor_name}{', ' + firm_name if firm_name else ''}</div>
+      </td></tr>
+      <tr><td style="height:3px;background:linear-gradient(90deg,#4f7cf6,#06b6d4);"></td></tr>
+      <tr><td style="padding: 28px 36px;">
+        <table cellpadding="0" cellspacing="0" border="0" width="100%">{items_html}</table>
+      </td></tr>
+      <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 36px;text-align:center;">
+        <p style="margin:0 0 8px;font-size:11px;color:#94a3b8;line-height:1.6;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;">
+          Weekend wrap from VeloQuant. Prepared for {advisor_name}{(' at ' + firm_name) if firm_name else ''}. Not investment advice.
+        </p>
+        {f'<p style="margin:0;font-size:11px;color:#94a3b8;font-family:-apple-system,sans-serif;"><a href="{unsubscribe_url}" style="color:#94a3b8;">Unsubscribe from VeloQuant emails</a></p>' if unsubscribe_url else ''}
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>"""
+
+
+def send_weekly_wrap_email(
+    advisor_email: str, advisor_name: str, firm_name: str, wrap_content: str,
+    unsubscribe_token: str = "", app_url: str = "",
+) -> bool:
+    """Send Friday executive wrap email."""
+    api_key = os.getenv("SENDGRID_API_KEY")
+    from_email = os.getenv("BRIEFING_FROM_EMAIL")
+    if not api_key or not from_email:
+        logger.warning("SendGrid not configured — skipping weekly wrap delivery")
+        return False
+    try:
+        today = datetime.now(timezone.utc).strftime("%b %d").replace(" 0", " ")
+        subject = f"Friday Wrap — Your Book This Week, {today}"
+        unsubscribe_url = f"{app_url}/unsubscribe/{unsubscribe_token}" if unsubscribe_token and app_url else ""
+        html_body = _weekly_wrap_to_html(wrap_content, advisor_name, firm_name or "", unsubscribe_url)
+        result = _send_transactional_email(advisor_email, subject, html_body, list_unsubscribe=unsubscribe_url)
+        if result:
+            logger.info(f"Weekly wrap email sent to {advisor_email}")
+        return result
+    except Exception as e:
+        logger.error(f"Failed to send weekly wrap email to {advisor_email}: {e}")
+        return False
+
+
 def send_welcome_email(to_email: str, name: str, firm_name: str, app_url: str) -> bool:
     html = f"""<!DOCTYPE html>
 <html><head><meta charset="UTF-8"></head>

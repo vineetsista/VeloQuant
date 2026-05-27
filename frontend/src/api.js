@@ -188,4 +188,11 @@ export const api = {
   deleteContact: (cid) => req(`/advisors/${id()}/contacts/${cid}`, { method: 'DELETE' }),
   deleteFilingAlert: (aid) => req(`/filing-alerts/${aid}`, { method: 'DELETE' }),
   deleteClientEmail: (eid) => req(`/client-emails/${eid}`, { method: 'DELETE' }),
+  askPortfolio: (question, history = []) => req(`/advisors/${id()}/ask`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question, history }),
+  }),
+  holdingDeepDive: (hid) => req(`/advisors/${id()}/holdings/${hid}/deep-dive`, { method: 'POST' }),
+  getTLHCandidates: () => req(`/advisors/${id()}/tlh-candidates`),
 }

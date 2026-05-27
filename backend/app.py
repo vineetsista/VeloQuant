@@ -1,4 +1,5 @@
 import os
+import re
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -31,6 +32,7 @@ from data.polygon import (
 from intelligence.briefing import generate_morning_briefing
 from intelligence.filing_analyzer import scan_and_analyze_filings
 from intelligence.email_generator import generate_client_email
+from intelligence.portfolio_qa import answer_question, deep_dive
 from scheduler import start_scheduler, run_morning_jobs
 from email_delivery import (
     send_verification_email,
@@ -459,10 +461,16 @@ def create_app():
             ps = float(data["position_size"])
             if ps <= 0:
                 return jsonify({"error": "Position size must be greater than zero"}), 400
+            if ps < 1:
+                return jsonify({"error": "Position size must be at least $1"}), 400
+            if ps > 1_000_000_000:
+                return jsonify({"error": "Position size must be under $1B"}), 400
         except (TypeError, ValueError):
             return jsonify({"error": "position_size must be a valid number"}), 400
 
         ticker = data["ticker"].upper().strip()
+        if not re.match(r"^[A-Z][A-Z.\-]{0,9}$", ticker):
+            return jsonify({"error": "Invalid ticker symbol"}), 400
 
         def _set_shares(h):
             try:
@@ -784,6 +792,10 @@ def create_app():
             advisor.price_alert_email_enabled = bool(data["price_alert_email_enabled"])
         if "briefing_focus" in data:
             focus = (data["briefing_focus"] or "").strip()
+            # Strip prompt-injection attempts: control chars, role tokens, instruction overrides
+            focus = re.sub(r'[\x00-\x1f\x7f]', '', focus)
+            focus = re.sub(r'(?i)(ignore\s+(?:all\s+)?(?:previous|prior|above)\s+instructions?)', '[redacted]', focus)
+            focus = re.sub(r'(?i)(<\s*(?:system|/system|assistant|/assistant|user|/user)\s*>)', '[redacted]', focus)
             advisor.briefing_focus = focus[:500] if focus else None
         db.session.commit()
         return jsonify(advisor.to_dict())
@@ -1024,6 +1036,7 @@ def create_app():
     # ── Briefing Generation ───────────────────────────────────────────────────
 
     @app.route("/api/advisors/<int:advisor_id>/generate-briefing", methods=["POST"])
+    @limiter.limit("8 per hour")
     def generate_briefing(advisor_id):
         if err := _assert_own(advisor_id):
             return err
@@ -1106,6 +1119,163 @@ def create_app():
             pass  # Never fail the briefing response due to snapshot errors
 
         return jsonify(briefing.to_dict()), 201
+
+    # ── Portfolio Q&A (Ask Anything) ──────────────────────────────────────────
+
+    @app.route("/api/advisors/<int:advisor_id>/ask", methods=["POST"])
+    @limiter.limit("30 per hour")
+    def ask_portfolio(advisor_id):
+        if err := _assert_own(advisor_id):
+            return err
+        advisor = db.get_or_404(Advisor, advisor_id)
+        gate = _require_subscription(advisor)
+        if gate:
+            return gate
+
+        body = request.get_json(silent=True) or {}
+        question = (body.get("question") or "").strip()
+        history  = body.get("history") or []
+
+        if not question:
+            return jsonify({"error": "Question cannot be empty"}), 400
+        if len(question) > 800:
+            return jsonify({"error": "Question is too long (max 800 chars)"}), 400
+
+        # Light prompt-injection guard
+        question = re.sub(r'[\x00-\x1f\x7f]', '', question)
+        question = re.sub(r'(?i)(<\s*(?:system|/system|assistant|/assistant)\s*>)', '[redacted]', question)
+
+        holdings = Holding.query.filter_by(advisor_id=advisor_id).all()
+        holdings_data = [
+            {
+                "ticker": h.ticker,
+                "position_size": float(h.position_size),
+                "shares": float(h.shares) if h.shares is not None else None,
+                "notes": h.notes,
+                "client_tag": h.client_tag,
+            }
+            for h in holdings
+        ]
+
+        latest = (
+            Briefing.query.filter_by(advisor_id=advisor_id)
+            .order_by(Briefing.generated_at.desc())
+            .first()
+        )
+        latest_content = latest.content if latest else None
+
+        # Sanitize history — only role + content, only strings
+        safe_history = []
+        for turn in history[-6:]:
+            if isinstance(turn, dict):
+                role = turn.get("role")
+                content = turn.get("content")
+                if role in ("user", "assistant") and isinstance(content, str) and content.strip():
+                    safe_history.append({"role": role, "content": content[:4000]})
+
+        try:
+            answer = answer_question(
+                question=question,
+                advisor_name=advisor.name,
+                firm_name=advisor.firm_name or "",
+                holdings=holdings_data,
+                latest_briefing=latest_content,
+                history=safe_history,
+            )
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+        from datetime import datetime as _dt, timezone as _tz
+        return jsonify({"answer": answer, "asked_at": _dt.now(_tz.utc).isoformat()})
+
+    # ── Holding Deep-Dive ─────────────────────────────────────────────────────
+
+    @app.route("/api/advisors/<int:advisor_id>/holdings/<int:holding_id>/deep-dive", methods=["POST"])
+    @limiter.limit("20 per hour")
+    def holding_deep_dive(advisor_id, holding_id):
+        if err := _assert_own(advisor_id):
+            return err
+        advisor = db.get_or_404(Advisor, advisor_id)
+        gate = _require_subscription(advisor)
+        if gate:
+            return gate
+
+        holding = db.get_or_404(Holding, holding_id)
+        if holding.advisor_id != advisor_id:
+            return jsonify({"error": "Forbidden"}), 403
+
+        holding_data = {
+            "ticker": holding.ticker,
+            "position_size": float(holding.position_size),
+            "shares": float(holding.shares) if holding.shares is not None else None,
+            "notes": holding.notes,
+            "client_tag": holding.client_tag,
+        }
+
+        try:
+            memo = deep_dive(
+                ticker=holding.ticker,
+                advisor_name=advisor.name,
+                holding=holding_data,
+            )
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+        from datetime import datetime as _dt, timezone as _tz
+        return jsonify({
+            "ticker": holding.ticker,
+            "memo": memo,
+            "generated_at": _dt.now(_tz.utc).isoformat(),
+        })
+
+    # ── Tax-Loss Harvesting Candidates ────────────────────────────────────────
+
+    @app.route("/api/advisors/<int:advisor_id>/tlh-candidates")
+    def tlh_candidates(advisor_id):
+        if err := _assert_own(advisor_id):
+            return err
+        from datetime import datetime as _dt, timezone as _tz
+        holdings = Holding.query.filter_by(advisor_id=advisor_id).all()
+        if not holdings:
+            return jsonify([])
+
+        tickers = [h.ticker for h in holdings]
+        try:
+            prices = get_snapshot_batch(tickers) or {}
+        except Exception:
+            prices = {}
+
+        candidates = []
+        now = _dt.now(_tz.utc)
+        for h in holdings:
+            close = prices.get(h.ticker.upper(), {}).get("close")
+            if not close or not h.shares:
+                continue
+            cost_basis = float(h.position_size)
+            current_value = float(h.shares) * float(close)
+            unrealized = current_value - cost_basis
+            if cost_basis <= 0 or unrealized >= 0:
+                continue
+            loss_pct = unrealized / cost_basis * 100
+            days_held = (now - h.created_at).days if h.created_at else None
+            # Only candidates with material loss; long-term gain treatment requires 31+ days post-sale, but suggest TLH at any held duration
+            if loss_pct <= -3:
+                candidates.append({
+                    "id": h.id,
+                    "ticker": h.ticker,
+                    "client_tag": h.client_tag,
+                    "cost_basis": round(cost_basis, 2),
+                    "current_value": round(current_value, 2),
+                    "unrealized_loss": round(unrealized, 2),
+                    "loss_pct": round(loss_pct, 2),
+                    "shares": float(h.shares),
+                    "current_price": round(float(close), 2),
+                    "days_held": days_held,
+                    "wash_sale_eligible": days_held is not None and days_held >= 31,
+                })
+
+        candidates.sort(key=lambda c: c["unrealized_loss"])
+        return jsonify(candidates)
 
     # ── Filing Analysis ───────────────────────────────────────────────────────
 

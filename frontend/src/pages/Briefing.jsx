@@ -20,6 +20,25 @@ export default function Briefing() {
 
   useEffect(() => { load() }, [])
 
+  // Keyboard navigation between briefings (← previous, → next, Cmd/Ctrl+E email)
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+      if (!briefings.length) return
+      const idx = briefings.findIndex(b => b.id === selected?.id)
+      if (e.key === 'ArrowDown' || e.key === 'j') {
+        if (idx < briefings.length - 1) setSelected(briefings[idx + 1])
+      } else if (e.key === 'ArrowUp' || e.key === 'k') {
+        if (idx > 0) setSelected(briefings[idx - 1])
+      } else if ((e.metaKey || e.ctrlKey) && e.key === 'c' && window.getSelection().toString() === '') {
+        // only when nothing else selected
+        handleCopy()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [briefings, selected])
+
   async function load() {
     setLoading(true)
     try {
@@ -212,6 +231,11 @@ export default function Briefing() {
               onChange={e => setSearch(e.target.value)}
               style={{ width: '100%', marginBottom: 10, fontSize: 13 }}
             />
+            <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6, letterSpacing: '0.06em' }}>
+              <span className="kbd">↑</span><span className="kbd">↓</span>
+              <span>to navigate · </span>
+              <span className="kbd">⎘</span><span>copy</span>
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {filtered.map(b => {
                 const isSelected = selected?.id === b.id
@@ -236,10 +260,12 @@ export default function Briefing() {
                         {new Date(b.generated_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                       </div>
                       <button
-                        onClick={ev => { ev.stopPropagation(); handleDelete(b.id) }}
+                        onClick={ev => { ev.stopPropagation(); if (window.confirm('Delete this briefing?')) handleDelete(b.id) }}
                         disabled={deleting === b.id}
-                        style={{ background: 'none', border: 'none', color: 'var(--text-2)', cursor: 'pointer', fontSize: 13, padding: '0 2px', opacity: 0, transition: 'opacity 0.15s' }}
-                        className="briefing-delete-btn"
+                        title="Delete briefing"
+                        style={{ background: 'none', border: 'none', color: 'var(--text-2)', cursor: 'pointer', fontSize: 13, padding: '0 4px', opacity: 0.55, transition: 'opacity 0.15s, color 0.15s' }}
+                        onMouseEnter={e => { e.currentTarget.style.opacity = 1; e.currentTarget.style.color = 'var(--danger)' }}
+                        onMouseLeave={e => { e.currentTarget.style.opacity = 0.55; e.currentTarget.style.color = 'var(--text-2)' }}
                       >✕</button>
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text-2)', marginBottom: 5 }}>

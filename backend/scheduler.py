@@ -172,6 +172,93 @@ def run_morning_jobs(flask_app):
         logger.info("Morning job finished")
 
 
+def run_weekly_wrap(flask_app):
+    """
+    Friday afternoon executive wrap. Sends a Friday 4:00pm ET email summarizing
+    the week, what's coming next week, and prepared client talking points.
+    """
+    import os
+    from datetime import datetime, timezone, timedelta
+    from models import db, Advisor, Holding, Briefing, PortfolioSnapshot
+    from intelligence.portfolio_qa import weekly_summary
+    from email_delivery import send_weekly_wrap_email
+
+    with flask_app.app_context():
+        app_url = os.getenv("APP_URL", "http://localhost:3000")
+        advisors = Advisor.query.all()
+        logger.info(f"Weekly wrap starting — {len(advisors)} advisor(s) to evaluate")
+
+        now = datetime.now(timezone.utc)
+        week_ago = now - timedelta(days=7)
+        sent = 0
+        for advisor in advisors:
+            # Skip advisors who turned the briefing email off
+            if not advisor.briefing_email_enabled:
+                continue
+            holdings = Holding.query.filter_by(advisor_id=advisor.id).all()
+            if not holdings:
+                continue
+
+            holdings_data = [
+                {
+                    "ticker": h.ticker,
+                    "position_size": float(h.position_size),
+                    "shares": float(h.shares) if h.shares is not None else None,
+                    "notes": h.notes,
+                    "client_tag": h.client_tag,
+                }
+                for h in holdings
+            ]
+
+            briefings = (
+                Briefing.query.filter_by(advisor_id=advisor.id)
+                .filter(Briefing.generated_at >= week_ago)
+                .order_by(Briefing.generated_at.desc())
+                .limit(5)
+                .all()
+            )
+            briefing_texts = [b.content for b in briefings]
+
+            snapshots = (
+                PortfolioSnapshot.query.filter_by(advisor_id=advisor.id)
+                .filter(PortfolioSnapshot.date >= week_ago.date())
+                .order_by(PortfolioSnapshot.date.asc())
+                .all()
+            )
+            snap_data = [{"date": s.date.isoformat(), "total_value": float(s.total_value)} for s in snapshots]
+
+            try:
+                content = weekly_summary(
+                    advisor_name=advisor.name,
+                    firm_name=advisor.firm_name or "",
+                    holdings=holdings_data,
+                    week_briefings=briefing_texts,
+                    snapshots=snap_data,
+                )
+            except Exception as e:
+                logger.error(f"Weekly wrap generation failed for advisor {advisor.id}: {e}")
+                continue
+
+            try:
+                advisor.ensure_unsubscribe_token()
+                db.session.commit()
+                ok = send_weekly_wrap_email(
+                    advisor_email=advisor.email,
+                    advisor_name=advisor.name,
+                    firm_name=advisor.firm_name,
+                    wrap_content=content,
+                    unsubscribe_token=advisor.unsubscribe_token,
+                    app_url=app_url,
+                )
+                if ok:
+                    sent += 1
+                    logger.info(f"Weekly wrap email sent to {advisor.email}")
+            except Exception as e:
+                logger.error(f"Weekly wrap email failed for advisor {advisor.id}: {e}")
+
+        logger.info(f"Weekly wrap finished — {sent} email(s) sent")
+
+
 def run_trial_reminders(flask_app):
     """Send reminder emails to advisors whose trials expire in 3 days or 1 day."""
     import os
@@ -237,6 +324,21 @@ def start_scheduler(flask_app):
         misfire_grace_time=3600,
     )
 
+    scheduler.add_job(
+        func=run_weekly_wrap,
+        args=[flask_app],
+        trigger=CronTrigger(
+            day_of_week="fri",
+            hour=16,
+            minute=15,
+            timezone="US/Eastern",
+        ),
+        id="weekly_wrap",
+        name="Friday Executive Wrap",
+        replace_existing=True,
+        misfire_grace_time=7200,
+    )
+
     scheduler.start()
-    logger.info("Scheduler started — morning briefings at 7:30am ET, trial reminders at 6:00am ET")
+    logger.info("Scheduler started — morning briefings 7:30am ET, trial reminders 6:00am ET, weekly wrap Fridays 4:15pm ET")
     return scheduler

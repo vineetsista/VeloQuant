@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api'
+import BriefingRenderer from '../components/BriefingRenderer'
 import usePageTitle from '../hooks/usePageTitle'
 
 const SECTOR_MAP = {
@@ -147,8 +148,16 @@ export default function Holdings() {
   const [alertThreshold, setAlertThreshold] = useState('')
   const [savingAlert,    setSavingAlert]    = useState(false)
   const [alertSavedId,   setAlertSavedId]   = useState(null)
+  const [deepDive,       setDeepDive]       = useState(null) // {ticker, memo, loading, error}
 
   useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    if (!deepDive) return
+    const handler = (e) => { if (e.key === 'Escape') setDeepDive(null) }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [deepDive])
 
   async function load() {
     setLoading(true)
@@ -256,6 +265,16 @@ export default function Holdings() {
       setExpandedClient(null)
     } catch (e) { setError(e.message) }
     finally { setSavingClient(false) }
+  }
+
+  async function runDeepDive(holding) {
+    setDeepDive({ ticker: holding.ticker, holdingId: holding.id, loading: true, memo: null, error: null })
+    try {
+      const data = await api.holdingDeepDive(holding.id)
+      setDeepDive({ ticker: data.ticker, holdingId: holding.id, loading: false, memo: data.memo, error: null })
+    } catch (e) {
+      setDeepDive({ ticker: holding.ticker, holdingId: holding.id, loading: false, memo: null, error: e.message })
+    }
   }
 
   async function handleAlertCreate(holdingId) {
@@ -1171,6 +1190,23 @@ ${upcomingEarnings.length > 0 ? `<h2>Upcoming Earnings (30 days)</h2>
                             {alertSavedId === h.id ? '✓ Set' : '⚡ Alert'}
                           </button>
                           <button
+                            onClick={() => runDeepDive(h)}
+                            disabled={deepDive?.loading && deepDive.holdingId === h.id}
+                            title="Generate analyst memo for this position"
+                            style={{
+                              fontSize: 11, padding: '3px 9px', borderRadius: 6,
+                              border: '1px solid rgba(79,124,246,0.3)',
+                              background: 'linear-gradient(135deg, rgba(79,124,246,0.10), rgba(6,182,212,0.06))',
+                              color: 'var(--accent)',
+                              cursor: deepDive?.loading && deepDive.holdingId === h.id ? 'wait' : 'pointer',
+                              fontFamily: 'inherit', fontWeight: 700,
+                              transition: 'all 0.14s', flexShrink: 0,
+                              letterSpacing: '0.02em',
+                            }}
+                          >
+                            {deepDive?.loading && deepDive.holdingId === h.id ? '◴ …' : '✺ Deep Dive'}
+                          </button>
+                          <button
                             className="btn btn-danger btn-sm"
                             onClick={() => handleDelete(h.id)}
                             style={{ fontSize: 11 }}
@@ -1336,6 +1372,77 @@ ${upcomingEarnings.length > 0 ? `<h2>Upcoming Earnings (30 days)</h2>
           </>
         )}
       </div>
+
+      {/* ── Deep Dive Modal ── */}
+      {deepDive && (
+        <div
+          onClick={() => setDeepDive(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(5,12,24,0.78)', backdropFilter: 'blur(6px)',
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+            padding: '64px 16px',
+            overflowY: 'auto',
+            animation: 'fadeIn 0.18s ease both',
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="glass"
+            style={{
+              maxWidth: 760, width: '100%',
+              padding: 0,
+              animation: 'fadeUp 0.32s cubic-bezier(0.16,1,0.3,1) both',
+            }}
+          >
+            <div style={{
+              padding: '24px 28px',
+              borderBottom: '1px solid var(--border)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
+              background: 'linear-gradient(135deg, rgba(79,124,246,0.10), rgba(6,182,212,0.04))',
+            }}>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 6 }}>✺ Analyst Deep Dive</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span className="chip" style={{ fontSize: 13, padding: '4px 10px' }}>{deepDive.ticker}</span>
+                  <span style={{ fontSize: 14, color: 'var(--text-2)' }}>One-page memo</span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {deepDive.memo && (
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(deepDive.memo) }}
+                    className="btn btn-outline btn-sm"
+                  >
+                    ⎘ Copy
+                  </button>
+                )}
+                <button
+                  onClick={() => setDeepDive(null)}
+                  className="icon-btn"
+                  title="Close (Esc)"
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+            <div style={{ padding: '28px 32px', maxHeight: 'calc(100vh - 220px)', overflowY: 'auto' }}>
+              {deepDive.loading && (
+                <div className="generating-box" style={{ padding: '60px 20px' }}>
+                  <div className="spin" />
+                  <div className="generating-title">Researching {deepDive.ticker}…</div>
+                  <div className="generating-sub">Pulling filings, news, earnings, and analyst data. ~30 seconds.</div>
+                </div>
+              )}
+              {deepDive.error && (
+                <div className="error-bar">{deepDive.error}</div>
+              )}
+              {deepDive.memo && <BriefingRenderer content={deepDive.memo} />}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

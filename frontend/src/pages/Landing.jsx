@@ -302,7 +302,7 @@ export default function Landing() {
               </div>
             </form>
 
-            <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 56 }}>No account required · Up to 10 tickers · Takes ~60 seconds</div>
+            <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 56 }}>Free demo · No account · Try with up to 10 tickers · Takes 60 seconds</div>
 
             {/* Trust pills */}
             <div style={{ display: 'flex', justifyContent: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -749,6 +749,61 @@ export default function Landing() {
           </div>
         </section>
 
+        {/* ── Founder Note ── */}
+        <section className="vq-reveal" style={{ padding: '90px 24px', borderTop: '1px solid var(--border)', background: 'linear-gradient(180deg, rgba(79,124,246,0.02), transparent 60%)' }}>
+          <div style={{ maxWidth: 780, margin: '0 auto' }}>
+            <div style={{ textAlign: 'center', marginBottom: 36 }}>
+              <div className="eyebrow">Why we built this</div>
+            </div>
+            <div style={{
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              borderRadius: 18, padding: '40px 42px',
+              position: 'relative',
+            }}>
+              <div style={{
+                position: 'absolute', top: -2, left: 28, right: 28, height: 2,
+                background: 'linear-gradient(90deg, transparent, var(--accent), var(--accent-b), transparent)',
+                borderRadius: 2,
+              }} />
+              <div style={{ display: 'flex', gap: 22, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div style={{
+                  width: 64, height: 64, flexShrink: 0,
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, var(--accent), var(--accent-b))',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 26, fontWeight: 900, color: '#fff',
+                  boxShadow: '0 8px 24px rgba(79,124,246,0.40)',
+                }}>VS</div>
+                <div style={{ flex: 1, minWidth: 240 }}>
+                  <p style={{ fontSize: 16, lineHeight: 1.78, color: 'var(--text)', marginBottom: 14, fontFamily: 'Source Serif Pro, Georgia, serif', fontStyle: 'italic' }}>
+                    "I grew up around independent advisors. Most of them are brilliant — but they're losing two hours every morning to research a team of analysts could do in fifteen minutes. The information advantage shouldn't belong only to the white-shoe firms. Goldman has Eisman; you should too."
+                  </p>
+                  <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 700, marginBottom: 2 }}>Vineet Sista</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-2)' }}>Founder, VeloQuant · Built in 2026</div>
+                </div>
+              </div>
+              <div style={{
+                marginTop: 28, paddingTop: 22, borderTop: '1px solid var(--border)',
+                display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 20,
+              }}>
+                {[
+                  { label: 'Built without VC pressure', desc: 'No artificial growth targets dictating product decisions.' },
+                  { label: 'Independent advisor first', desc: 'Every feature is designed for boutique books, not asset managers.' },
+                  { label: 'Transparent pricing', desc: 'One number. No tiers, seats, or annual contracts.' },
+                ].map(item => (
+                  <div key={item.label}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 6 }}>{item.label}</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.65 }}>{item.desc}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── ROI Calculator ── */}
+        <ROISection navigate={navigate} />
+
         {/* ── FAQ ── */}
         <section className="vq-reveal" style={{ padding: '80px 24px', maxWidth: 720, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 48 }}>
@@ -835,5 +890,112 @@ export default function Landing() {
 
       </div>
     </div>
+  )
+}
+
+function ROISection({ navigate }) {
+  const [hours, setHours] = useState(2)
+  const [billRate, setBillRate] = useState(250)
+  const [daysPerWeek, setDaysPerWeek] = useState(5)
+  const weeklyHours = hours * daysPerWeek
+  const annualHours = weeklyHours * 50
+  const annualValue = annualHours * billRate
+  const monthlyValue = annualValue / 12
+  const paybackHours = (99 / billRate).toFixed(1)
+
+  const fmt = (n) => `$${Math.round(n).toLocaleString()}`
+
+  return (
+    <section className="vq-reveal" style={{ padding: '90px 24px', borderTop: '1px solid var(--border)', background: 'rgba(255,255,255,0.012)' }}>
+      <div style={{ maxWidth: 880, margin: '0 auto' }}>
+        <div style={{ textAlign: 'center', marginBottom: 44 }}>
+          <div className="eyebrow">ROI Calculator</div>
+          <h2 style={{ fontSize: 'clamp(24px, 3vw, 38px)', fontWeight: 900, letterSpacing: '-0.03em', margin: '14px 0 12px' }}>What is your morning research costing you?</h2>
+          <p style={{ fontSize: 14, color: 'var(--text-2)', maxWidth: 540, margin: '0 auto', lineHeight: 1.65 }}>
+            Hours you spend prepping that you could be billing or spending with clients.
+          </p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1fr) minmax(280px, 1fr)', gap: 24, alignItems: 'stretch' }}>
+          {/* Inputs */}
+          <div className="card" style={{ padding: 30 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 22 }}>Your Inputs</div>
+
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontSize: 13, color: 'var(--text-2)', fontWeight: 600 }}>Hours of morning prep / day</span>
+                <span style={{ fontSize: 14, color: 'var(--text)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{hours}</span>
+              </div>
+              <input type="range" min={0.5} max={4} step={0.25} value={hours} onChange={e => setHours(parseFloat(e.target.value))}
+                style={{ width: '100%', accentColor: 'var(--accent)' }} />
+            </div>
+
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontSize: 13, color: 'var(--text-2)', fontWeight: 600 }}>Your effective hourly rate</span>
+                <span style={{ fontSize: 14, color: 'var(--text)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>${billRate}</span>
+              </div>
+              <input type="range" min={100} max={600} step={25} value={billRate} onChange={e => setBillRate(parseInt(e.target.value))}
+                style={{ width: '100%', accentColor: 'var(--accent)' }} />
+            </div>
+
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontSize: 13, color: 'var(--text-2)', fontWeight: 600 }}>Trading days per week</span>
+                <span style={{ fontSize: 14, color: 'var(--text)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{daysPerWeek}</span>
+              </div>
+              <input type="range" min={2} max={5} step={1} value={daysPerWeek} onChange={e => setDaysPerWeek(parseInt(e.target.value))}
+                style={{ width: '100%', accentColor: 'var(--accent)' }} />
+            </div>
+
+            <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--border)', fontSize: 12, color: 'var(--text-2)', lineHeight: 1.65 }}>
+              Effective hourly rate ≈ (annual billings + AUM fees) ÷ (working hours). Most independent advisors net $200–$400/hr.
+            </div>
+          </div>
+
+          {/* Output */}
+          <div className="card card-glow" style={{
+            padding: 30,
+            background: 'linear-gradient(135deg, rgba(79,124,246,0.10), rgba(6,182,212,0.04))',
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 16 }}>The Number</div>
+
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 4 }}>Your morning research costs you</div>
+            <div style={{
+              fontSize: 48, fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1,
+              background: 'linear-gradient(120deg, var(--text), var(--accent-b))',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+              fontVariantNumeric: 'tabular-nums',
+              marginBottom: 6,
+            }}>{fmt(annualValue)}<span style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-2)', WebkitTextFillColor: 'var(--text-2)' }}> / yr</span></div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 24 }}>
+              That's <strong style={{ color: 'var(--text)', fontWeight: 700 }}>{fmt(monthlyValue)}/mo</strong> of opportunity cost.
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 22 }}>
+              <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '14px 16px' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-2)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>Annual Hours</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>{annualHours.toLocaleString()}</div>
+              </div>
+              <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '14px 16px' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-2)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>VeloQuant Cost</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--success)', fontVariantNumeric: 'tabular-nums' }}>$1,188/yr</div>
+              </div>
+            </div>
+
+            <div style={{ background: 'rgba(16,217,123,0.07)', border: '1px solid rgba(16,217,123,0.22)', borderRadius: 10, padding: '14px 16px', marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--success)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 4 }}>Payback</div>
+              <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.65 }}>
+                VeloQuant pays for itself in <strong style={{ color: 'var(--success)', fontWeight: 800 }}>{paybackHours} hours</strong> of your time per month.
+              </div>
+            </div>
+
+            <button className="btn btn-primary" onClick={() => navigate('/onboarding')} style={{ width: '100%', justifyContent: 'center', padding: '12px 16px', fontSize: 14 }}>
+              Reclaim Your Mornings →
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
   )
 }

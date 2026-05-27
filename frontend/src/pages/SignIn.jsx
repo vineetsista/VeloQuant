@@ -97,10 +97,10 @@ export default function SignIn() {
                   }}
                 >{showPassword ? 'Hide' : 'Show'}</button>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
-                <span onClick={() => navigate('/forgot-password')} style={{ fontSize: 12, color: 'var(--accent)', cursor: 'pointer' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                <button type="button" onClick={() => navigate('/forgot-password')} style={{ fontSize: 12, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3, padding: 0, fontWeight: 600 }}>
                   Forgot password?
-                </span>
+                </button>
               </div>
             </div>
 

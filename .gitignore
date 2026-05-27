@@ -3,6 +3,14 @@
 .env.local
 .env.*.local
 
+# Personal / strategy docs (kept local only)
+MARKETING_PLAN.md
+NOTES.md
+
+# Claude Code local config
+.claude/
+CLAUDE.md
+
 # Python
 __pycache__/
 *.pyc
